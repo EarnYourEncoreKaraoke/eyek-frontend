@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>EYEK • Firebase Test</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font:16px/1.5 system-ui, Arial; padding:20px; max-width:900px; margin:0 auto; }
+    code,pre{background:#f6f6f9; padding:6px 8px; border-radius:8px}
+    .ok{color:green;font-weight:700}
+    .err{color:#b00020;font-weight:700}
+  </style>
+</head>
+<body>
+  <h1>EYEK • Firebase Connection Test</h1>
+  <p id="status">Loading…</p>
+  <pre id="details"></pre>
+  <p id="rw" style="margin-top:12px"></p>
+
+  <script type="module">
+    import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+    import { firebaseConfig } from "../firebase-config.js"; // <-- uses your config file
+
+    const $ = (id)=>document.getElementById(id);
+
+    try {
+      const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+      $("status").innerHTML = `<span class="ok">Initialized</span> for project: <code>${app.options.projectId}</code>`;
+      $("details").textContent = JSON.stringify(app.options, null, 2);
+
+      // Optional Firestore read/write probe (will fail if rules block it — that still proves init works)
+      try {
+        const db = getFirestore(app);
+        const ref = doc(db, "diagnostics", "connect-test");
+        await setDoc(ref, {
+          when: new Date().toISOString(),
+          ua: navigator.userAgent,
+          ts: serverTimestamp(),
+        }, { merge: true });
+        const snap = await getDoc(ref);
+        $("rw").innerHTML = `<span class="ok">Firestore OK</span> — doc data: <code>${JSON.stringify(snap.data())}</code>`;
+      } catch (e) {
+        $("rw").innerHTML = `<span class="err">Firestore write/read failed</span>: ${e.message}
+          <br>(This still means your Firebase config is good; it only means your Firestore rules blocked writes.)`;
+      }
+    } catch (e) {
+      $("status").innerHTML = `<span class="err">Init failed</span>: ${e.message}`;
+    }
+  </script>
+</body>
+</html>

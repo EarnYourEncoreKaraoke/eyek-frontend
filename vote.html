@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>EYEK • Vote</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>Vote</h1>
+    <div class="card">
+      <div class="row two">
+        <input id="eventCode" placeholder="Event Code (e.g., ANGE-1006-ABC)"/>
+        <input id="votePin" placeholder="PIN (if required)"/>
+      </div>
+      <div class="row two">
+        <button class="primary" id="btnEncore">Encore!</button>
+        <button id="btnAnother">Another Song</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnMaybe">Maybe</button>
+      </div>
+      <div id="voteMsg" class="small" style="margin-top:10px"></div>
+    </div>
+    <div class="small mono" id="log"></div>
+  </div>
+
+  <script type="module" src="./app-vote.js"></script>
+</body>
+</html>

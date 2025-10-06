@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>EYEK • Host Console</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>Host Console</h1>
+    <p class="small">Sign in with your host account (your email must be added to your org by the super admin).</p>
+
+    <div class="card">
+      <h2>Sign In</h2>
+      <div class="row two">
+        <input id="hostEmail" placeholder="Email"/>
+        <input id="hostPass" placeholder="Password" type="password"/>
+      </div>
+      <div class="row two">
+        <button id="btnHostSignIn" class="primary">Sign In</button>
+        <button id="btnHostSignOut">Sign Out</button>
+      </div>
+      <div id="hostAuth" class="small badges" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Create Event</h2>
+      <div class="row two">
+        <input id="venueName" placeholder="Venue name"/>
+        <input id="eventPin" placeholder="Optional PIN"/>
+      </div>
+      <button id="btnCreateEvent" class="accent">Create Event</button>
+      <div id="eventInfo" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Voting Controls</h2>
+      <div class="row two">
+        <button id="btnOpen" class="primary">Open Voting (90s)</button>
+        <button id="btnExtend">Extend +30s</button>
+      </div>
+      <div class="row two" style="margin-top:10px">
+        <button id="btnClose">Close Voting</button>
+        <button id="btnRefreshEvent">Reload Event State</button>
+      </div>
+      <div id="voteState" class="small mono" style="margin-top:8px"></div>
+    </div>
+
+    <div id="log" class="small mono"></div>
+  </div>
+
+  <script type="module" src="./app-host.js"></script>
+</body>
+</html>

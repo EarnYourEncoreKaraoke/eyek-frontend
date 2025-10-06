@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>EYEK • Admin</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>Admin Console</h1>
+    <p class="small">Sign in as <strong>admin@earnyourencorekaraoke.com</strong> (super admin), then create an org and add a host.</p>
+
+    <div class="card">
+      <h2>Sign In</h2>
+      <div class="row two">
+        <input id="adminEmail" placeholder="Email" value="admin@earnyourencorekaraoke.com"/>
+        <input id="adminPass" placeholder="Password" type="password"/>
+      </div>
+      <div class="row two">
+        <button id="btnAdminSignIn" class="primary">Sign In</button>
+        <button id="btnAdminSignOut">Sign Out</button>
+      </div>
+      <div id="authStatus" class="small badges" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Create Organization (Tenant)</h2>
+      <div class="row two">
+        <input id="orgId" placeholder="org id (e.g., angelic-tunes)"/>
+        <input id="orgName" placeholder="org name (e.g., Angelic Tunes Karaoke)"/>
+      </div>
+      <button id="btnCreateOrg" class="accent">Create Org</button>
+      <div id="orgMsg" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Add Host to Org</h2>
+      <div class="row two">
+        <input id="hostEmail" placeholder="host email (must exist in Firebase Auth)"/>
+        <input id="hostOrgId" placeholder="org id (same as above)"/>
+      </div>
+      <button id="btnAddHost" class="accent">Add Host</button>
+      <div id="hostMsg" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <div id="log" class="small mono"></div>
+  </div>
+
+  <script type="module" src="./app-admin.js"></script>
+</body>
+</html>
