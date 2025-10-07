@@ -1,181 +1,216 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Encore! — How It Works</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
+<meta charset="utf-8" />
+<title>Encore! • KJ / Host Overview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@600;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg1:#3b0066; --bg2:#5b0099;
-    --ink:#0f0a1a;
-    --txt:#ffffff; --muted:#d8c7ff;
-    --green:#25d366; --yellow:#f6c945; --red:#ff5e6c; --accent:#b692ff;
-    --card:#1b0930; --card2:#16072a; --line:#6f52a8;
+    /* brand palette */
+    --ink:#12051f;
+    --bg1:#1B0930; --bg2:#16072A;
+    --txt:#ffffff; --sub:#e6dbff; --muted:#cdbff0;
+    --line:#6f52a8;
+    --brand:#b692ff;
+    --green:#25d366; --yellow:#f6c945; --red:#ff5e6c;
   }
   *{box-sizing:border-box}
   body{
-    margin:0; color:var(--txt);
-    background:linear-gradient(135deg,var(--bg1),var(--bg2));
-    font:16px/1.55 "Montserrat",system-ui;
+    margin:0;background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    color:var(--txt);font:16px/1.45 "Montserrat",system-ui;
   }
-  .wrap{max-width:1100px;margin:0 auto;padding:24px}
-  header{ text-align:center; padding:10px 0 4px }
-  .eyek{font-family:"Bebas Neue"; letter-spacing:1px; font-size:64px; margin:0}
-  .tag{margin:6px 0 0; color:#ffcc00; font-weight:700}
-  .blurb{
-    margin:18px auto 26px; color:var(--muted); max-width:900px; font-size:18px
-  }
+  .wrap{max-width:1100px;margin:0 auto;padding:22px}
+  header{display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;margin:6px 0 14px}
+  .logo{display:flex;align-items:center;gap:10px}
+  .badge{padding:6px 10px;border-radius:999px;background:rgba(182,146,255,.15);border:1px solid rgba(182,146,255,.5);font-weight:800}
+  h1{font-family:"Bebas Neue";font-size:64px;letter-spacing:1px;margin:6px 0 0}
+  .sub{color:var(--sub);max-width:900px}
+
   .card{
-    background:linear-gradient(180deg,var(--card),var(--card2));
-    border:1px solid var(--line);
-    border-radius:16px; box-shadow:0 14px 44px rgba(0,0,0,.35);
-    overflow:hidden; margin:18px 0;
+    background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
+    border:1px solid var(--line); border-radius:18px; padding:16px; margin:16px 0;
+    box-shadow:0 14px 40px rgba(0,0,0,.35);
   }
-  .row{display:grid; grid-template-columns:1fr; gap:0}
-  .imgWrap{background:#0f0a1a; display:flex; align-items:center; justify-content:center}
-  .imgWrap img{width:100%; height:auto; display:block}
-  .copy{padding:16px 18px}
-  h2{margin:0 0 6px; font-family:"Bebas Neue"; font-size:34px; letter-spacing:.5px}
-  p{margin:8px 0 0}
-  .pill{display:inline-block; padding:6px 10px; border-radius:999px; font-weight:800; margin-right:8px;}
-  .g{background:var(--green); color:#072a14}
-  .y{background:var(--yellow); color:#352600}
-  .r{background:var(--red); color:#2b0e12}
+  .row{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:center}
+  .row.alt{grid-template-columns:1fr 1.1fr}
+  .imgWrap{border:1px solid rgba(255,255,255,.18);border-radius:14px;overflow:hidden;background:#0e0620}
+  .imgWrap img{display:block;width:100%;height:auto}
+  .copy h2{margin:0 0 6px;font-family:"Bebas Neue";font-size:44px;letter-spacing:.5px}
+  .copy p{margin:10px 0;color:#f5f0ff}
   .muted{color:var(--muted)}
-  footer{ text-align:center; color:#cfc3ff; font-size:13px; margin:26px 0 10px; opacity:.9 }
-  /* simple responsive */
-  @media (min-width:880px){
-    .row{grid-template-columns:1.2fr .9fr}
-    .row.alt{grid-template-columns:.9fr 1.2fr}
+  .pill{display:inline-block;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);font-weight:800}
+  .em{color:var(--brand)}
+  .accentG{color:var(--green)} .accentY{color:var(--yellow)} .accentR{color:var(--red)}
+  footer{margin:22px 0 10px;text-align:center;color:var(--muted);font-size:14px}
+
+  @media (max-width:900px){
+    .row,.row.alt{grid-template-columns:1fr}
+    h1{font-size:48px}
   }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1 class="eyek">Earn Your Encore Karaoke</h1>
-    <p class="tag">A simple, exciting vote-to-continue format</p>
-  </header>
+  <div class="wrap">
+    <header>
+      <div class="logo">
+        <span class="badge">Encore! Voting</span>
+      </div>
+      <h1>Give Your Crowd a Voice — Keep Your Show Moving</h1>
+      <p class="sub">
+        A simple, live voting flow that keeps great singers coming back and engages the whole room.
+        Works with your existing KJ setup. <span class="em">No winner—just Encore!, Another Shot!, or Maybe Next Time!</span>
+      </p>
+    </header>
 
-  <p class="blurb">
-    Singers get a warm-up song, then the room votes on their next one. There’s no “overall winner” — just a fun,
-    fair rotation driven by the crowd. <span class="muted">KJ runs the show; we simply provide the voting.</span>
-  </p>
+    <!-- 1: Host control (updated copy as requested) -->
+    <section class="card">
+      <div class="row">
+        <div class="imgWrap">
+          <img src="/assets/photos/EYEK-HOST.jpg" alt="Encore! Host control page" loading="lazy">
+        </div>
+        <div class="copy">
+          <h2>Encore! Host Controls the Show</h2>
+          <p>
+            The <strong>Encore! Host</strong> (often the KJ) manages the event:
+            set the venue and host name, pick the current singer, start and end voting,
+            and see live results at a glance. Quick-access buttons keep the show flowing.
+          </p>
+          <p>
+            Encore! can be run by the KJ or by a dedicated Encore! operator (available in our local service areas).
+            KJs can <strong>register</strong>, <strong>subscribe</strong>, and add
+            <em>Encore! Nights</em> to their existing karaoke shows anytime.
+          </p>
+          <p class="muted">Requires Internet access. <strong>Offline mode coming soon!</strong></p>
+        </div>
+      </div>
+    </section>
 
-  <!-- 1: Host control -->
-  <section class="card">
-    <div class="row">
-      <div class="imgWrap">
-        <img src="/assets/photos/EYEK-HOST.jpg" alt="Host control page on a laptop" loading="lazy">
+    <!-- 2: Screen overview -->
+    <section class="card">
+      <div class="row alt">
+        <div class="copy">
+          <h2>Beautiful Big-Screen Display</h2>
+          <p>
+            The main screen welcomes guests, shows the host/venue, and highlights who’s up.
+            During voting, a timer and live tally keep the room focused and engaged.
+          </p>
+          <p class="muted">Clean, readable layouts work great on TVs and projectors.</p>
+        </div>
+        <div class="imgWrap">
+          <img src="/assets/photos/EYEK-SCREEN.jpg" alt="Main screen welcome and now-singing view" loading="lazy">
+        </div>
       </div>
-      <div class="copy">
-        <h2>Host Controls Everything</h2>
-        <p>The KJ sets the venue, host name, and current singer, starts the vote, and ends the round. Quick buttons allow host votes too.</p>
-        <p class="muted">Your laptop is connected to the venue audio; all sounds (vote open / results) play from here.</p>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 2: Screen display -->
-  <section class="card">
-    <div class="row alt">
-      <div class="copy">
-        <h2>Big Screen Display</h2>
-        <p>Shows “Welcome to” with the public venue name, “Hosted by” the KJ, and the current singer. During voting it animates incoming votes; after, it displays the result card.</p>
-        <p><span class="pill g">Encore!</span><span class="pill y">Another Shot!</span><span class="pill r">Maybe Next Time!</span></p>
+    <!-- 3: Voter experience -->
+    <section class="card">
+      <div class="row">
+        <div class="imgWrap">
+          <img src="/assets/photos/EYEK-VOTER1.jpg" alt="Audience voting on phone" loading="lazy">
+        </div>
+        <div class="copy">
+          <h2>One-Tap Voting on Phones</h2>
+          <p>
+            Guests join with the event PIN and tap to vote:
+            <span class="accentG">Encore!</span>,
+            <span class="accentY">Another Shot!</span>, or
+            <span class="accentR">Maybe Next Time!</span>
+          </p>
+          <p class="muted">We enforce one vote per device per singer to keep it fair.</p>
+        </div>
       </div>
-      <div class="imgWrap">
-        <img src="/assets/photos/EYEK-SCREEN.jpg" alt="Screen welcome / now singing" loading="lazy">
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 3: Voter UI -->
-  <section class="card">
-    <div class="row">
-      <div class="imgWrap">
-        <img src="/assets/photos/EYEK-VOTER1.jpg" alt="Mobile voter page" loading="lazy">
+    <!-- 4: Live inbound balls -->
+    <section class="card">
+      <div class="row alt">
+        <div class="copy">
+          <h2>Live Votes That Feel Alive</h2>
+          <p>
+            Every vote animates in as a colored ball—green for <b>Encore!</b>,
+            yellow for <b>Another Shot!</b>, red for <b>Maybe Next Time!</b>.
+            The room can literally see the momentum!
+          </p>
+        </div>
+        <div class="imgWrap">
+          <img src="/assets/photos/EYEK-INBOUND-VOTE.jpg" alt="Voting balls flowing into screen columns" loading="lazy">
+        </div>
       </div>
-      <div class="copy">
-        <h2>Simple Voter Page</h2>
-        <p>Audience members enter the event PIN once, then tap to vote. One vote per device per singer is enforced.</p>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 4: Live inbound votes -->
-  <section class="card">
-    <div class="row alt">
-      <div class="copy">
-        <h2>Live Momentum</h2>
-        <p>As votes come in, animated dots hit the columns on the big screen. Everyone can feel the energy build.</p>
+    <!-- 5: Encore result -->
+    <section class="card">
+      <div class="row">
+        <div class="imgWrap">
+          <img src="/assets/photos/EYEK-ENCORE.jpg" alt="Encore result celebration" loading="lazy">
+        </div>
+        <div class="copy">
+          <h2>Celebrate the Moment</h2>
+          <p>
+            When time’s up, the result shows for a short burst—<b class="accentG">Encore!</b>,
+            <b class="accentY">Another Shot!</b>, or <b class="accentR">Maybe Next Time!</b>.
+            No single “winner”—just a smooth rotation that rewards crowd favorites.
+          </p>
+        </div>
       </div>
-      <div class="imgWrap">
-        <img src="/assets/photos/EYEK-INBOUND-VOTE.jpg" alt="Inbound vote animation" loading="lazy">
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 5: Encore result -->
-  <section class="card">
-    <div class="row">
-      <div class="imgWrap">
-        <img src="/assets/photos/EYEK-ENCORE.jpg" alt="Encore winner" loading="lazy">
+    <!-- 6: Hype splashes -->
+    <section class="card">
+      <div class="row alt">
+        <div class="copy">
+          <h2>Built-In Hype &amp; Prompts</h2>
+          <p>
+            Need a pop of energy? Fire a quick splash like <b>“Make Some Noise!”</b>
+            or drop a <b>“Thanks for coming out!”</b> at the end of the night.
+          </p>
+        </div>
+        <div class="imgWrap">
+          <img src="/assets/photos/EYEK-SPLASH-NOISE.jpg" alt="Make some noise splash" loading="lazy">
+        </div>
       </div>
-      <div class="copy">
-        <h2>Encore!</h2>
-        <p>Encore winners stay in the rotation. Another Shot singers can be re-inserted later. “Maybe Next Time” singers politely exit for the night.</p>
-        <p class="muted">It keeps the show tight, fun, and rewarding for strong performers — while still giving everyone a great time.</p>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 6: Hype splash -->
-  <section class="card">
-    <div class="row alt">
-      <div class="copy">
-        <h2>Hype Moments</h2>
-        <p>Occasional on-screen splashes like “Make Some Noise!” keep the crowd engaged between songs.</p>
+    <!-- 7: Encore board -->
+    <section class="card">
+      <div class="row">
+        <div class="imgWrap">
+          <img src="/assets/photos/EYEK-BOARD-LG.jpg" alt="Encore board view" loading="lazy">
+        </div>
+        <div class="copy">
+          <h2>The Encore Board</h2>
+          <p>
+            A clean board view shows recent <b class="accentG">Encore!</b> and
+            <b class="accentY">Another Shot!</b> results at a glance—perfect for a side TV.
+          </p>
+        </div>
       </div>
-      <div class="imgWrap">
-        <img src="/assets/photos/EYEK-SPLASH-NOISE.jpg" alt="Make some noise splash" loading="lazy">
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 7: Board -->
-  <section class="card">
-    <div class="row">
-      <div class="imgWrap">
-        <img src="/assets/photos/EYEK-BOARD-LG.jpg" alt="Encore & Another Shot board" loading="lazy">
+    <!-- 8: Thanks splash -->
+    <section class="card">
+      <div class="row alt">
+        <div class="copy">
+          <h2>End on a High Note</h2>
+          <p>
+            Wrap the night with a branded “Thanks” screen and keep guests excited for the next Encore! Night.
+          </p>
+        </div>
+        <div class="imgWrap">
+          <img src="/assets/photos/EYEK-THANKS.jpg" alt="Thanks splash" loading="lazy">
+        </div>
       </div>
-      <div class="copy">
-        <h2>The Board</h2>
-        <p>A clean board view shows the most recent Encore! and Another Shot! singers — easy for the KJ and crowd to follow.</p>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 8: Thanks -->
-  <section class="card">
-    <div class="row alt">
-      <div class="copy">
-        <h2>Finish Strong</h2>
-        <p>End the night with a quick “Thanks for coming out!” message. The rotation remains friendly — come back and try again!</p>
-      </div>
-      <div class="imgWrap">
-        <img src="/assets/photos/EYEK-THANKS.jpg" alt="Thanks splash" loading="lazy">
-      </div>
-    </div>
-  </section>
+    <footer>
+      &copy; <span id="y"></span> Earn Your Encore Karaoke • All rights reserved
+    </footer>
+  </div>
 
-  <footer>
-    &copy; <span id="yr"></span> Earn Your Encore Karaoke
-  </footer>
-</div>
 <script>
-  document.getElementById('yr').textContent = new Date().getFullYear();
+  // tiny year fill
+  document.getElementById('y').textContent = new Date().getFullYear();
 </script>
 </body>
 </html>
