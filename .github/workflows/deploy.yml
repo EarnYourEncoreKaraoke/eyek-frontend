@@ -2,23 +2,37 @@ name: Deploy to SiteGround (SFTP)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
+    # only run when site files change (tweak as you like)
+    paths:
+      - "assets/**"
+      - "host/**"
+      - "screen/**"
+      - "board/**"
+      - "vote/**"
+      - "auth/**"
+      - "reports/**"
+      - "index.html"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: SFTP Deploy
+      # ---- SFTP deploy (SSH key; no password) ----
+      - name: SFTP deploy (site root)
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          server: ${{ secrets.SG_HOST }}
-          port: 22
-          username: ${{ secrets.SG_USER }}
-          ssh_private_key: ${{ secrets.SG_KEY }}
-          local_path: "./"
-          remote_path: ${{ secrets.SG_REMOTE_PATH }}
-          sftp_only: true
-          delete_remote_files: false
+          server: ${{ secrets.SG_SERVER }}          # e.g. sgXXXX.siteground.biz or your domain
+          port: ${{ secrets.SG_PORT }}              # e.g. 22 or 18765 (SiteGround often uses 18765)
+          username: ${{ secrets.SG_USERNAME }}      # your SiteGround system user
+          ssh_private_key: ${{ secrets.SG_KEY }}    # entire private key text (BEGIN OPENSSH PRIVATE KEY...)
+          local_path: "./"                          # deploy everything in this repo
+          remote_path: ${{ secrets.SG_REMOTE_PATH }}# e.g. /home/USER/public_html (or subdomain path)
+          sftp_only: true                           # needed on SiteGround
+          delete_remote_files: "false"              # keep anything extra on server
+          # password: not used; leave unset
