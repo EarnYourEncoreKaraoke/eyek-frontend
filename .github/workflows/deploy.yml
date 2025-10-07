@@ -1,0 +1,36 @@
+name: Deploy to SiteGround (vote subdomain)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      # Decode the base64 secret back into a proper private key file
+      - name: Decode SSH key
+        run: |
+          echo "${{ secrets.SG_KEY_B64 }}" | base64 --decode > /tmp/sg_key
+          chmod 600 /tmp/sg_key
+
+      # Optional: verify remote path env for the next step
+      - name: Show target path
+        run: echo "Deploying to ${{ secrets.SG_REMOTE_PATH }}"
+
+      # Deploy everything in the repo to SiteGround via SFTP
+      - name: Deploy via SFTP
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          server: ${{ secrets.SG_SERVER }}
+          port: ${{ secrets.SG_PORT }}
+          username: ${{ secrets.SG_USERNAME }}
+          ssh_private_key: /tmp/sg_key
+          local_path: "./"
+          remote_path: ${{ secrets.SG_REMOTE_PATH }}
+          sftp_only: true
+          delete_remote_files: false
