@@ -86,7 +86,7 @@
     <details class="setup" id="setupPanel" open>
       <summary>Event Setup</summary>
       <div class="body">
-        <!-- Row 1: Venue + City -->
+        <!-- Row 1: Venue Name + City -->
         <div class="row">
           <div>
             <div class="sublabel">Venue Name</div>
@@ -98,6 +98,13 @@
             <input id="venueCity" list="venuesCityList" placeholder="City" />
             <datalist id="venuesCityList"></datalist>
           </div>
+        </div>
+
+        <!-- Row 1.5: Public Venue Name shown on Screen/Vote -->
+        <div style="margin-top:8px">
+          <div class="sublabel">Public Venue Name (shown on Screen/Vote)</div>
+          <input id="venuePublic" list="venuesPublicList" placeholder="Public Venue Name" />
+          <datalist id="venuesPublicList"></datalist>
         </div>
 
         <!-- Row 2: KJ Company + Host Name -->
@@ -266,8 +273,8 @@ async function fetchState(){
 
 function normalizeState(){
   state=state||{};
-  state.event   ||= {venue:'',venueCity:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false};
-  state.saved   ||= {venues:[], venuesCity:[], kjs:[]};
+  state.event   ||= {venue:'',venueCity:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false};
+  state.saved   ||= {venues:[], venuesCity:[], venuesPublic:[], kjs:[]};
   state.singers ||= [];
   state.current ||= {id:null,name:'',songArtist:''};
   state.voting  ||= {open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}};
@@ -305,16 +312,16 @@ function suppressEventRender(ms=1200){ suppressEventRenderUntil = Date.now() + m
 function mayRenderEventInputs(){ return Date.now() > suppressEventRenderUntil; }
 
 /* ---------- ELEMENTS ---------- */
-const venue=$('#venue'), venueCity=$('#venueCity'), eventDate=$('#eventDate'), kj=$('#kj'), hostName=$('#hostName'), pin=$('#pin');
-const venuesList=document.getElementById('venuesList'), venuesCityList=document.getElementById('venuesCityList'), kjsList=document.getElementById('kjsList');
+const venue=$('#venue'), venueCity=$('#venueCity'), venuePublic=$('#venuePublic'), eventDate=$('#eventDate'), kj=$('#kj'), hostName=$('#hostName'), pin=$('#pin');
+const venuesList=document.getElementById('venuesList'), venuesCityList=document.getElementById('venuesCityList'), venuesPublicList=document.getElementById('venuesPublicList'), kjsList=document.getElementById('kjsList');
 const singerName=$('#singerName'), songArtist=$('#songArtist');
 const singerList=$('#singerList');
 const currentName=$('#currentName'), currentSongArtist=$('#currentSongArtist');
-const timerEl=$('#timer'), cE=document.getElementById('c_encore')||document.createElement('b'), cA=document.getElementById('c_another')||document.createElement('b'), cM=document.getElementById('c_maybe')||document.createElement('b'), resultTag=$('#resultTag');
+const timerEl=$('#timer'), resultTag=$('#resultTag');
 const pinSaved=$('#pinSaved'); const togglePin=$('#togglePin');
 
 /* ---------- INPUT BEHAVIOR ---------- */
-[venue, venueCity, eventDate, kj, hostName, pin].forEach(el=>{
+[venue, venueCity, venuePublic, eventDate, kj, hostName, pin].forEach(el=>{
   el.addEventListener('focusin', ()=>{ pausePolling(); markEdit(el.id); });
   el.addEventListener('focusout', resumePollingSoon);
   el.addEventListener('input', ()=>{ markEdit(el.id); pausePolling(); });
@@ -322,19 +329,24 @@ const pinSaved=$('#pinSaved'); const togglePin=$('#togglePin');
 
 /* ---------- DATALISTS & REMEMBERED VALUES ---------- */
 function updateDatalistsImmediate(){
-  const Lvenues = JSON.parse(localStorage.getItem('eyek_saved_venues') || '[]');
-  const Lcities = JSON.parse(localStorage.getItem('eyek_saved_venues_city') || '[]');
-  const Lkjs    = JSON.parse(localStorage.getItem('eyek_saved_kjs') || '[]');
-  const venues = [...new Set([...(state.saved.venues||[]), ...Lvenues])];
-  const cities = [...new Set([...(state.saved.venuesCity||[]), ...Lcities])];
-  const kjs    = [...new Set([...(state.saved.kjs||[]),    ...Lkjs])];
-  venuesList.innerHTML     = venues.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
-  venuesCityList.innerHTML = cities.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
-  kjsList.innerHTML        = kjs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
+  const Lvenues  = JSON.parse(localStorage.getItem('eyek_saved_venues') || '[]');
+  const Lcities  = JSON.parse(localStorage.getItem('eyek_saved_venues_city') || '[]');
+  const Lpubs    = JSON.parse(localStorage.getItem('eyek_saved_venues_public') || '[]');
+  const Lkjs     = JSON.parse(localStorage.getItem('eyek_saved_kjs') || '[]');
+
+  const venues   = [...new Set([...(state.saved.venues||[]), ...Lvenues])];
+  const cities   = [...new Set([...(state.saved.venuesCity||[]), ...Lcities])];
+  const pubs     = [...new Set([...(state.saved.venuesPublic||[]), ...Lpubs])];
+  const kjs      = [...new Set([...(state.saved.kjs||[]),    ...Lkjs])];
+
+  venuesList.innerHTML       = venues.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
+  venuesCityList.innerHTML   = cities.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
+  venuesPublicList.innerHTML = pubs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
+  kjsList.innerHTML          = kjs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
 }
 function pushLocalList(key, val){
   val=(val||'').trim(); if(!val) return;
-  const map = { venue:'eyek_saved_venues', venueCity:'eyek_saved_venues_city', kj:'eyek_saved_kjs' };
+  const map = { venue:'eyek_saved_venues', venueCity:'eyek_saved_venues_city', venuePublic:'eyek_saved_venues_public', kj:'eyek_saved_kjs' };
   const k = map[key] || 'eyek_saved_kjs';
   const arr = JSON.parse(localStorage.getItem(k) || '[]');
   const next = [val, ...arr.filter(x=>x.toLowerCase()!==val.toLowerCase())].slice(0,50);
@@ -350,14 +362,15 @@ function render(){
   updateDatalistsImmediate();
 
   const canPaint = mayRenderEventInputs();
-  if (canPaint && canUpdateField(venue,'venue'))          venue.value     = state.event.venue || '';
-  if (canPaint && canUpdateField(venueCity,'venueCity'))  venueCity.value = state.event.venueCity || '';
-  if (canPaint && canUpdateField(eventDate,'eventDate'))  eventDate.value = state.event.date || new Date().toISOString().slice(0,10);
-  if (canPaint && canUpdateField(kj,'kj'))                kj.value        = state.event.kj || '';
-  if (canPaint && canUpdateField(hostName,'hostName'))    hostName.value  = state.event.hostName || '';
-  if (canPaint && canUpdateField(pin,'pin'))              pin.value       = state.event.pin || '';
+  if (canPaint && canUpdateField(venue,'venue'))             venue.value        = state.event.venue || '';
+  if (canPaint && canUpdateField(venueCity,'venueCity'))     venueCity.value    = state.event.venueCity || '';
+  if (canPaint && canUpdateField(venuePublic,'venuePublic')) venuePublic.value  = state.event.venuePublic || '';
+  if (canPaint && canUpdateField(eventDate,'eventDate'))     eventDate.value    = state.event.date || new Date().toISOString().slice(0,10);
+  if (canPaint && canUpdateField(kj,'kj'))                   kj.value           = state.event.kj || '';
+  if (canPaint && canUpdateField(hostName,'hostName'))       hostName.value     = state.event.hostName || '';
+  if (canPaint && canUpdateField(pin,'pin'))                 pin.value          = state.event.pin || '';
   const disabled = state.event.locked;
-  [venue,venueCity,eventDate,kj,hostName,pin].forEach(el=>el.disabled=disabled);
+  [venue,venueCity,venuePublic,eventDate,kj,hostName,pin].forEach(el=>el.disabled=disabled);
 
   document.getElementById('lockEvent').textContent = disabled ? 'Unlock' : 'Lock';
   document.getElementById('setupPanel').open = !disabled;
@@ -412,10 +425,15 @@ function bindLive(el, key, transform=(x)=>x, immediate=false){
   };
   el.addEventListener('input', handler);
   el.addEventListener('change', handler);
-  el.addEventListener('blur', ()=>{ if(key==='venue'||key==='venueCity'||key==='kj'){ pushLocalList(key, el.value); }});
+  el.addEventListener('blur', ()=>{
+    if(key==='venue'||key==='venueCity'||key==='venuePublic'||key==='kj'){
+      pushLocalList(key, el.value);
+    }
+  });
 }
 bindLive(venue,       'venue');
 bindLive(venueCity,   'venueCity');
+bindLive(venuePublic, 'venuePublic');
 bindLive(eventDate,   'date');
 bindLive(kj,          'kj');
 bindLive(hostName,    'hostName');
@@ -433,6 +451,7 @@ togglePin.onclick = ()=>{
 document.getElementById('saveEvent').onclick = async ()=>{
   pushLocalList('venue', venue.value);
   pushLocalList('venueCity', venueCity.value);
+  pushLocalList('venuePublic', venuePublic.value);
   pushLocalList('kj', kj.value);
   await postState(); const m=document.getElementById('eventSavedMsg'); m.textContent='Saved!'; setTimeout(()=>m.textContent='',1400);
 };
@@ -444,8 +463,8 @@ document.getElementById('resetEvent').onclick = async ()=>{
   if(state.event.locked){ alert('Unlock to reset.'); return;}
   if(!confirm('Reset this event? This clears singers & votes.')) return;
   state={ serverUpdatedAt: Date.now()/1000|0,
-    event:{venue:'',venueCity:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false},
-    saved:{venues: state.saved?.venues ?? [], venuesCity: state.saved?.venuesCity ?? [], kjs: state.saved?.kjs ?? []},
+    event:{venue:'',venueCity:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false},
+    saved:{venues: state.saved?.venues ?? [], venuesCity: state.saved?.venuesCity ?? [], venuesPublic: state.saved?.venuesPublic ?? [], kjs: state.saved?.kjs ?? []},
     singers:[], current:{id:null,name:'',songArtist:''},
     voting:{open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}},
     winners:{encore:[], another:[], maybe:[]}
@@ -608,7 +627,6 @@ document.getElementById('play_loser').onclick  = async ()=>{ await sfx.forceEnab
   setInterval(()=>{ document.title = base + ' ' + frames[i++ % frames.length]; }, 2000);
 })();
 (function dateFallback(){
-  // very old desktop browsers without date picker
   const i=eventDate; if(i && i.type!=='date'){ i.placeholder='YYYY-MM-DD'; }
 })();
 (async function init(){ await fetchState(); render(); loop(); })();
