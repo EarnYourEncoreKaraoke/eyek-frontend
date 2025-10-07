@@ -3,7 +3,7 @@ name: Deploy to SiteGround (SFTP)
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -12,29 +12,15 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # Optional: fail early if any secret is missing
-      - name: Check required secrets
-        run: |
-          test -n "${{ secrets.SG_SERVER }}" || (echo "Missing SG_SERVER" && exit 1)
-          test -n "${{ secrets.SG_PORT }}" || (echo "Missing SG_PORT" && exit 1)
-          test -n "${{ secrets.SG_USERNAME }}" || (echo "Missing SG_USERNAME" && exit 1)
-          test -n "${{ secrets.SG_PRIVATE_KEY }}" || (echo "Missing SG_PRIVATE_KEY" && exit 1)
-
-      # Deploy everything in the repo root to the SiteGround docroot for the subdomain
-      - name: SFTP Deploy
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Deploy via SFTP
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
           server: ${{ secrets.SG_SERVER }}
-          username: ${{ secrets.SG_USERNAME }}
-          protocol: sftp
           port: ${{ secrets.SG_PORT }}
-          privateKey: ${{ secrets.SG_PRIVATE_KEY }}
-          local-dir: ./
-          server-dir: /home/customer/www/vote.earnyourencorekaraoke.com/public_html/
-          # keep remote files that aren’t in the repo (set true only if you want a nuke + full sync)
-          dangerous-clean-slate: false
-          exclude: |
-            **/.git*
-            **/.github/**
-            **/_ci/**
-            **/README.md
+          username: ${{ secrets.SG_USERNAME }}
+          ssh_private_key: ${{ secrets.SG_SSH_KEY }}
+          local_path: "./"
+          remote_path: "/home/customer/www/vote.earnyourencorekaraoke.com/public_html"
+          sftp_only: true
+          delete_remote_files: false
+          sftpArgs: "-o StrictHostKeyChecking=no"
