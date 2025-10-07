@@ -16,12 +16,11 @@
   .wrap{min-height:100svh;display:flex;flex-direction:column;gap:16px;padding:24px}
 
   .head{text-align:center}
-  .welcome{font-size:28px;margin:0;color:var(--green);opacity:.95} /* green */
+  .welcome{font-size:28px;margin:0;color:var(--green);opacity:.95}
   .venue{font-family:"Bebas Neue";font-size:66px;letter-spacing:1px;margin:2px 0 0}
-  .host{font-size:26px;margin:4px 0 0;color:var(--yellow)}          /* yellow */
-
+  .host{font-size:26px;margin:4px 0 0;color:var(--yellow)}
   .now{margin-top:28px;text-align:center}
-  .nowLbl{font-family:"Bebas Neue";font-size:42px;margin:0;color:var(--green)} /* green */
+  .nowLbl{font-family:"Bebas Neue";font-size:42px;margin:0;color:var(--green)}
   .nowName{font-family:"Bebas Neue";font-size:64px;margin:10px 0 0}
 
   .voteTop{display:flex;justify-content:space-between;align-items:flex-start;margin-top:10px}
@@ -48,8 +47,14 @@
   .ov-ano{background:rgba(246,201,69,.1); border-color: rgba(246,201,69,.55)}
   .ov-may{background:rgba(255,94,108,.1); border-color: rgba(255,94,108,.55)}
 
-  #confetti{position:fixed;inset:0;pointer-events:none;display:none}
+  /* Announcement overlay */
+  .annOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.82);z-index:60}
+  .annCard{width:min(1200px,92vw);text-align:center;border:3px solid rgba(255,255,255,.25);border-radius:22px;padding:34px;background:rgba(255,255,255,.05)}
+  .annTitle{font-family:"Bebas Neue";font-size:110px;margin:0;color:#fff;text-shadow:0 0 24px rgba(255,255,255,.25)}
+  .annMsg{white-space:pre-line;font-size:32px;margin:12px 0 0;color:#ffe}
+  .annNoise{border-color:rgba(255,255,255,.35); background:radial-gradient(circle at 50% 0%, rgba(246,201,69,.25), transparent 60%), radial-gradient(circle at 10% 100%, rgba(37,211,102,.2), transparent 60%), radial-gradient(circle at 90% 50%, rgba(255,94,108,.22), transparent 60%)}
 
+  #confetti{position:fixed;inset:0;pointer-events:none;display:none}
   #heartbeat{position:fixed;width:1px;height:1px;left:-10px;top:-10px;background:transparent;transform:translateX(0);will-change:transform;animation:hb 2s linear infinite}
   @keyframes hb{0%{transform:translateX(0)}50%{transform:translateX(1px)}100%{transform:translateX(0)}}
 </style>
@@ -90,6 +95,7 @@
   </section>
 </div>
 
+<!-- result overlay -->
 <div id="overlay" class="overlay">
   <div id="ovCard" class="ovCard">
     <div id="ovTitle" class="ovTitle">Encore!</div>
@@ -97,11 +103,19 @@
   </div>
 </div>
 
+<!-- announcement overlay -->
+<div id="annOverlay" class="annOverlay">
+  <div id="annCard" class="annCard">
+    <div id="annTitle" class="annTitle">Announcement</div>
+    <p id="annMsg" class="annMsg"></p>
+  </div>
+</div>
+
 <script>
 const GET_URL='/assets/get_state.php';
 const $=s=>document.querySelector(s);
 
-/* Wake Lock to keep TVs awake */
+/* Wake Lock */
 let wakeLock=null;
 async function requestWakeLock(){ try{ if('wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); } }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') requestWakeLock(); });
@@ -114,9 +128,12 @@ rafId=requestAnimationFrame(tick);
 
 /* Time & state */
 let state=null,lastCounts={encore:0,another:0,maybe:0},clockOffset=0;
-let prevPhase='idle';
-let overlayTokenShown='';   // "kind|name|when"
-let overlayHideTimer=null;
+let overlayHideAt=0, cachedWinnerName='', cachedWinnerKind=null;
+let prevPhase='idle', phaseHoldUntil=0;
+let lastShownSinger='';
+let resultSuppressed=true;
+let resultShownFor='';
+let annSeenToken=''; // prevents flicker
 
 function nowMs(){return Date.now()+clockOffset}
 function smoothOffset(o){if(!isFinite(o))return;clockOffset=0.9*clockOffset+0.1*o}
@@ -125,7 +142,12 @@ async function fetchState(){
   const r=await fetch(GET_URL,{cache:'no-store'});
   const fetchedAt=Date.now(); state=await r.json();
   if(state && typeof state.serverNow==='number'){ smoothOffset(state.serverNow - fetchedAt); }
-  render();
+  ensureDefaults(); render();
+}
+function ensureDefaults(){
+  state.event   ||= {venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false,
+                     venueColor:'#25d366', kjColor:'#f6c945', hostColor:'#f6c945'};
+  state.voting  ||= {open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}};
 }
 setInterval(fetchState,1000); fetchState();
 
@@ -133,8 +155,20 @@ function fmt(ms){ const s=Math.ceil(ms/1000); const m=Math.floor(s/60), r=s%60; 
 
 function setHeader(){
   $('#welcome').textContent = 'Welcome to';
-  $('#venue').textContent   = (state?.event?.venuePublic||'').trim() || '—';
-  $('#hostBy').textContent  = (state?.event?.kj ? `Hosted by ${state.event.kj}` : 'Hosted by —');
+  const vColor = state?.event?.venueColor || '#25d366';
+  const kjColor = state?.event?.kjColor || '#f6c945';
+  const hostColor = state?.event?.hostColor || '#f6c945';
+
+  const venueText = (state?.event?.venuePublic||'').trim() || '—';
+  $('#venue').textContent   = venueText;
+  $('#venue').style.color   = vColor;
+
+  const kjName = (state?.event?.kj||'').trim();
+  const hostLine = kjName ? `Hosted by ${kjName}` : 'Hosted by —';
+  $('#hostBy').textContent  = hostLine;
+  $('#hostBy').style.color  = kjColor;
+
+  $('#nowLbl').style.color = state?.event?.venueColor || '#25d366';
 }
 function setNow(name){ $('#nowName').textContent = name || '—'; }
 
@@ -185,23 +219,34 @@ function stepConfetti(){
 function resize(){ confettiCanvas.width=innerWidth; confettiCanvas.height=innerHeight; }
 addEventListener('resize', resize);
 
-/* Overlay */
+/* Overlay (results) */
 function showOverlay(kind, name){
   const ov=$('#overlay'), card=$('#ovCard'), title=$('#ovTitle'), sub=$('#ovSub');
   card.className='ovCard '+(kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
   title.textContent = kind==='encore' ? 'Encore!' : (kind==='another' ? 'Another Shot!' : 'Maybe Next Time!');
-
   const cleanName = String(name||'').replace(/\.\s*$/,'');
   sub.textContent = (kind==='maybe')
     ? (cleanName ? `Thanks, ${cleanName}!` : 'Thanks for singing!')
     : (cleanName ? `Congratulations, ${cleanName}!` : 'Congratulations!');
-
   ov.style.display='flex';
-  if(kind==='encore') startConfetti(); else stopConfetti();
-
-  clearTimeout(overlayHideTimer);
-  overlayHideTimer = setTimeout(()=>{ ov.style.display='none'; stopConfetti(); }, 15000);
+  overlayHideAt = Date.now()+15000;
+  if(kind==='encore') startConfetti();
 }
+function hideOverlay(){
+  $('#overlay').style.display='none';
+  stopConfetti();
+  overlayHideAt=0;
+}
+
+/* Announcement overlay */
+function showAnnouncement(kind, msg){
+  const wrap=$('#annOverlay'), card=$('#annCard'), title=$('#annTitle'), p=$('#annMsg');
+  title.textContent = (kind==='noise') ? 'Make Some Noise!' : 'Thank You!';
+  p.textContent = msg || '';
+  card.className = 'annCard ' + (kind==='noise' ? 'annNoise' : '');
+  wrap.style.display='flex';
+}
+function hideAnnouncement(){ $('#annOverlay').style.display='none'; }
 
 /* --- RENDER --- */
 function render(){
@@ -212,12 +257,26 @@ function render(){
   const open = !!state?.voting?.open;
   const prep = (!open && (state?.voting?.prepUntil||0) > t);
   const endsAt = state?.voting?.endsAt || 0;
-  const lastResult = state?.voting?.lastResult || null;
+  const hadResult = !!state?.voting?.lastResult;
 
+  // Anti-flicker phase selection
   let phase='idle';
-  if(prep) phase='prep';
+  if(prep) { phase='prep'; phaseHoldUntil = Math.max(phaseHoldUntil, (state.voting.prepUntil||0) + 1200); }
   else if(open) phase='open';
-  else if(lastResult) phase='result';
+  else if(hadResult) phase='result';
+  else if(t < phaseHoldUntil) phase='prep';
+
+  // If new singer is set, hide any overlay and clear suppression so the next result can show
+  if(curName && curName !== lastShownSinger){
+    if($('#overlay').style.display==='flex') hideOverlay();
+    resultSuppressed = false;
+  }
+
+  // entering open => reset columns once
+  if(phase==='open' && prevPhase!=='open'){
+    ['#colE','#colA','#colM'].forEach(s=>$(s).innerHTML = '<div class="label">'+(s==='#colE'?'Encore!':s==='#colA'?'Another Shot!':'Maybe Next Time!')+'</div>');
+    lastCounts={encore:0,another:0,maybe:0};
+  }
 
   const header=$('#header'), nowBlock=$('#nowBlock'), votingArea=$('#votingArea');
   if(phase==='prep' || phase==='open'){
@@ -230,6 +289,7 @@ function render(){
     votingArea.style.display='none';
   }
 
+  // Show current singer in idle/result too
   if(phase==='idle' || phase==='result'){
     $('#nowLbl').textContent = 'Now Singing';
     setNow(curName);
@@ -237,6 +297,8 @@ function render(){
     $('#nowLbl').textContent = (phase==='prep') ? 'Get Ready' : 'Now Voting';
     setNow(curName);
   }
+
+  if(overlayHideAt && Date.now()>overlayHideAt){ hideOverlay(); }
 
   if(phase==='prep'){
     $('#voteNow').textContent = curName ? `Get ready to vote for: ${curName}` : 'Get ready to vote…';
@@ -259,16 +321,31 @@ function render(){
     if(cm>lastCounts.maybe)   spawn('#colM','maybe',   cm-lastCounts.maybe);
     lastCounts={encore:ce,another:ca,maybe:cm};
   } else if(phase==='result'){
-    // Build a token so we only show overlay once per result
-    const token = `${lastResult}|${curName}|${state.serverUpdatedAt||0}`;
-    if(token && token !== overlayTokenShown){
-      overlayTokenShown = token;
-      showOverlay(lastResult, curName);
+    const kind = state?.voting?.lastResult;
+    const token = `${kind}|${curName}`;
+    if($('#overlay').style.display!=='flex' && !resultSuppressed && token!==resultShownFor){
+      const nameForOverlay = curName || cachedWinnerName;
+      showOverlay(kind, nameForOverlay);
+      resultShownFor = token;
     }
   }
 
+  // Announcements
+  const ann = state?.announcement;
+  if(ann && Date.now() < (ann.until||0)){
+    const token = (ann.kind||'?') + '|' + String(ann.msg||'') + '|' + String(ann.until||0);
+    if(token !== annSeenToken){
+      showAnnouncement(ann.kind, ann.msg);
+      annSeenToken = token;
+    }
+  } else {
+    hideAnnouncement();
+  }
+
   prevPhase = phase;
+  lastShownSinger = curName;
 }
 </script>
 </body>
 </html>
+<!-- FILE: /screen/index.html -->
