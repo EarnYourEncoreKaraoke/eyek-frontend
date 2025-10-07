@@ -1,0 +1,59 @@
+name: Manual SFTP/SSH probe (safe)
+
+on:
+  workflow_dispatch:   # run manually from the Actions tab
+
+concurrency:
+  group: sftp-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe SSH -> list target dir
+    runs-on: ubuntu-latest
+    environment: sftp-staging   # keeps these secrets separate from your FTP ones
+    steps:
+      - name: Checkout (not strictly required)
+        uses: actions/checkout@v4
+
+      - name: Add private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # trust host key on first connect
+          touch ~/.ssh/known_hosts
+          ssh-keyscan -p "${{ secrets.SFTP_PORT }}" "${{ secrets.SFTP_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: SSH probe (pwd + ls)
+        run: |
+          set -eux
+          ssh -p "${{ secrets.SFTP_PORT }}" \
+              -o StrictHostKeyChecking=yes \
+              "${{ secrets.SFTP_USER }}@${{ secrets.SFTP_HOST }}" \
+              "echo 'Connected as:' \$(whoami) && pwd && ls -la '${{ secrets.SFTP_REMOTE_DIR }}'"
+
+  # sync:
+  #   name: (Optional) Deploy via rsync over SSH
+  #   needs: [probe]
+  #   if: ${{ success() }}
+  #   runs-on: ubuntu-latest
+  #   environment: sftp-staging
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Add private key
+  #       run: |
+  #         mkdir -p ~/.ssh
+  #         echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+  #         chmod 600 ~/.ssh/id_ed25519
+  #         touch ~/.ssh/known_hosts
+  #         ssh-keyscan -p "${{ secrets.SFTP_PORT }}" "${{ secrets.SFTP_HOST }}" >> ~/.ssh/known_hosts
+  #     - name: rsync mirror to remote
+  #       run: |
+  #         set -eux
+  #         rsync -az --delete \
+  #           -e "ssh -p ${{ secrets.SFTP_PORT }}" \
+  #           --exclude '.git*/' \
+  #           --exclude 'node_modules/' \
+  #           ./ \
+  #           "${{ secrets.SFTP_USER }}@${{ secrets.SFTP_HOST }}:${{ secrets.SFTP_REMOTE_DIR }}/"
