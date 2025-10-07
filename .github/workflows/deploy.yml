@@ -1,8 +1,9 @@
 name: Deploy via FTPS to SiteGround
+
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   deploy:
@@ -19,12 +20,12 @@ jobs:
           password: ${{ secrets.SG_FTPS_PASSWORD }}
           protocol: ftps
           port: 21
-          # your new FTP user is chrooted to the subdomain root, so deploy to /
-          server-dir: /
+          server-dir: /www/vote.earnyourencorekaraoke.com/public_html
           local-dir: ./
-          dangerous-clean-slate: false
-          log-level: verbose
+          # keeps .git and .github from uploading; add more patterns if you want
           exclude: |
             **/.git*
             **/.git*/**
+            **/.github/**
             **/node_modules/**
+          log-level: verbose
