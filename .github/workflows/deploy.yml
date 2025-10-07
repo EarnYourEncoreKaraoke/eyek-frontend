@@ -9,23 +9,32 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout latest code
         uses: actions/checkout@v4
 
-      - name: Deploy with FTPS
+      - name: Deploy to SiteGround via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
+          # === Required secrets (set these under Settings → Secrets → Actions) ===
           server: ${{ secrets.SG_FTPS_SERVER }}
           username: ${{ secrets.SG_FTPS_USERNAME }}
           password: ${{ secrets.SG_FTPS_PASSWORD }}
+
+          # === Connection details ===
           protocol: ftps
           port: 21
-          server-dir: /www/vote.earnyourencorekaraoke.com/public_html
+          server-dir: /www/vote.earnyourencorekaraoke.com/public_html/
           local-dir: ./
-          # keeps .git and .github from uploading; add more patterns if you want
+
+          # === Clean exclusions (don’t upload dev files) ===
           exclude: |
             **/.git*
             **/.git*/**
             **/.github/**
             **/node_modules/**
+            **/README.md
+            **/LICENSE
+            **/.vscode/**
+            **/.DS_Store
+
           log-level: verbose
