@@ -86,7 +86,6 @@
     <details class="setup" id="setupPanel" open>
       <summary>Event Setup</summary>
       <div class="body">
-        <!-- Row 1: Venue Name + City -->
         <div class="row">
           <div>
             <div class="sublabel">Venue Name</div>
@@ -100,14 +99,12 @@
           </div>
         </div>
 
-        <!-- Row 1.5: Public Venue Name shown on Screen/Vote -->
         <div style="margin-top:8px">
           <div class="sublabel">Public Venue Name (shown on Screen/Vote)</div>
           <input id="venuePublic" list="venuesPublicList" placeholder="Public Venue Name" />
           <datalist id="venuesPublicList"></datalist>
         </div>
 
-        <!-- Row 2: KJ Company + Host Name -->
         <div class="row" style="margin-top:8px">
           <div>
             <div class="sublabel">KJ Company</div>
@@ -120,7 +117,6 @@
           </div>
         </div>
 
-        <!-- Row 3: Date + PIN -->
         <div class="row" style="margin-top:8px">
           <div>
             <div class="sublabel">Event Date</div>
@@ -192,6 +188,29 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Public tally snapshot on Host -->
+              <div class="divider"></div>
+              <div class="miniRow">
+                <div>
+                  <div class="miniLbl">Encore!</div>
+                  <div id="miniE" class="miniWhite"></div>
+                </div>
+                <div>
+                  <div class="miniLbl">Another Shot!</div>
+                  <div id="miniA" class="miniWhite"></div>
+                </div>
+                <div>
+                  <div class="miniLbl">Maybe Next Time!</div>
+                  <div id="miniM" class="miniWhite"></div>
+                </div>
+              </div>
+              <div class="tally">
+                <div class="chip enc">Encore! <b id="cE" style="margin-left:8px">0</b></div>
+                <div class="chip ano">Another Shot! <b id="cA" style="margin-left:8px">0</b></div>
+                <div class="chip may">Maybe Next Time! <b id="cM" style="margin-left:8px">0</b></div>
+              </div>
+
             </div>
           </div>
 
@@ -244,15 +263,20 @@ function debounce(fn, wait=300){ let t; return (...a)=>{ clearTimeout(t); t=setT
 const $=s=>document.querySelector(s);
 const digitsOnly = s => (s||'').replace(/\D+/g,'');
 
+/* ---------- CLOCK OFFSET ---------- */
 let clockOffset = 0;
 function nowMs(){ return Date.now() + clockOffset; }
 function smoothOffset(observed){ if(!isFinite(observed)) return; clockOffset = 0.9*clockOffset + 0.1*observed; }
 
-/* ---------- STATE (server + local fallback) ---------- */
+/* ---------- STATE ---------- */
 let state=null, poll=null;
 let useLocalFallback=false;
 const LKEY='eyek_state';
 
+/* do NOT force-open/close setup on every render; we only toggle when user clicks */
+let setupOpenSticky = true;
+
+/* ---------- FETCH ---------- */
 async function fetchState(){
   try{
     const r=await fetch(GET_URL,{cache:'no-store'});
@@ -264,7 +288,6 @@ async function fetchState(){
       smoothOffset(state.serverNow - fetchedAt);
     }
   }catch(e){
-    // fallback to local
     useLocalFallback=true;
     state = JSON.parse(localStorage.getItem(LKEY)||'{}');
   }
@@ -299,7 +322,7 @@ const postStateDebounced = debounce(async ()=>{
   await fetchState(); render();
 }, 220);
 
-/* ---------- EDIT GUARDS / RENDER THROTTLE ---------- */
+/* ---------- EDIT GUARDS ---------- */
 const lastEdit = Object.create(null);
 const RECENT_MS = 12000;
 function markEdit(id){ lastEdit[id] = Date.now(); }
@@ -307,6 +330,7 @@ function canUpdateField(el, id){ if(document.activeElement === el) return false;
 let pollPaused=false, resumeTimer=null;
 function pausePolling(){ pollPaused=true; clearTimeout(resumeTimer); }
 function resumePollingSoon(){ clearTimeout(resumeTimer); resumeTimer=setTimeout(()=>{ pollPaused=false; }, 1800); }
+
 let suppressEventRenderUntil = 0;
 function suppressEventRender(ms=1200){ suppressEventRenderUntil = Date.now() + ms; }
 function mayRenderEventInputs(){ return Date.now() > suppressEventRenderUntil; }
@@ -319,6 +343,7 @@ const singerList=$('#singerList');
 const currentName=$('#currentName'), currentSongArtist=$('#currentSongArtist');
 const timerEl=$('#timer'), resultTag=$('#resultTag');
 const pinSaved=$('#pinSaved'); const togglePin=$('#togglePin');
+const cE=$('#cE'), cA=$('#cA'), cM=$('#cM');
 
 /* ---------- INPUT BEHAVIOR ---------- */
 [venue, venueCity, venuePublic, eventDate, kj, hostName, pin].forEach(el=>{
@@ -327,7 +352,7 @@ const pinSaved=$('#pinSaved'); const togglePin=$('#togglePin');
   el.addEventListener('input', ()=>{ markEdit(el.id); pausePolling(); });
 });
 
-/* ---------- DATALISTS & REMEMBERED VALUES ---------- */
+/* ---------- DATALISTS ---------- */
 function updateDatalistsImmediate(){
   const Lvenues  = JSON.parse(localStorage.getItem('eyek_saved_venues') || '[]');
   const Lcities  = JSON.parse(localStorage.getItem('eyek_saved_venues_city') || '[]');
@@ -369,11 +394,12 @@ function render(){
   if (canPaint && canUpdateField(kj,'kj'))                   kj.value           = state.event.kj || '';
   if (canPaint && canUpdateField(hostName,'hostName'))       hostName.value     = state.event.hostName || '';
   if (canPaint && canUpdateField(pin,'pin'))                 pin.value          = state.event.pin || '';
+
   const disabled = state.event.locked;
   [venue,venueCity,venuePublic,eventDate,kj,hostName,pin].forEach(el=>el.disabled=disabled);
 
-  document.getElementById('lockEvent').textContent = disabled ? 'Unlock' : 'Lock';
-  document.getElementById('setupPanel').open = !disabled;
+  // keep the panel open/closed based on the last user action only
+  document.getElementById('setupPanel').open = setupOpenSticky && !disabled ? true : (!setupOpenSticky ? false : true);
 
   // rotation list
   singerList.innerHTML='';
@@ -403,6 +429,16 @@ function render(){
   } else {
     timerEl.textContent='00:00'; announce(state.voting.lastResult);
   }
+
+  // live tallies on host
+  const ce=state?.voting?.counts?.encore||0, ca=state?.voting?.counts?.another||0, cm=state?.voting?.counts?.maybe||0;
+  cE.textContent=ce; cA.textContent=ca; cM.textContent=cm;
+
+  // spawn mini-dots when counts increase
+  if(ce>lastCounts.encore)  spawnMini('#miniE','encore',  ce-lastCounts.encore);
+  if(ca>lastCounts.another) spawnMini('#miniA','another', ca-lastCounts.another);
+  if(cm>lastCounts.maybe)   spawnMini('#miniM','maybe',   cm-lastCounts.maybe);
+  lastCounts={encore:ce,another:ca,maybe:cm};
 }
 function fmt(ms){ const s=Math.ceil(ms/1000); const m=Math.floor(s/60), r=s%60; return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` }
 function announce(w){
@@ -410,6 +446,27 @@ function announce(w){
   if(w==='encore'){ resultTag.textContent='Encore!'; resultTag.className='resultTag r-encore'; }
   else if(w==='another'){ resultTag.textContent='Another Shot!'; resultTag.className='resultTag r-another'; }
   else { resultTag.textContent='Maybe Next Time'; resultTag.className='resultTag r-maybe'; }
+}
+
+/* mini-dots */
+function spawnMini(containerSel, kind, n=1){
+  const box=$(containerSel); if(!box) return;
+  const cls = kind==='encore'?'g':kind==='another'?'y':'r';
+  const W=box.clientWidth, H=box.clientHeight;
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div'); d.className='mdot '+cls;
+    d.style.left=(Math.random()*W|0)+'px'; d.style.top='-8px';
+    box.appendChild(d);
+    let x=parseFloat(d.style.left), y=-8, vx=(Math.random()*1.6-0.8), vy=(Math.random()*1.2+0.6);
+    const g=0.25, fr=0.82, dt=16;
+    const id=setInterval(()=>{
+      vy+=g; x+=vx*dt/16; y+=vy*dt/16;
+      if(x<8){x=8;vx*=-fr} if(x>W-8){x=W-8;vx*=-fr}
+      if(y>H-8){y=H-8; vy*=-fr; if(Math.abs(vy)<0.25){clearInterval(id);} }
+      d.style.left=x+'px'; d.style.top=y+'px';
+    }, dt);
+    if(box.childNodes.length>120){ box.removeChild(box.firstChild); }
+  }
 }
 
 /* ---------- BINDINGS ---------- */
@@ -457,6 +514,7 @@ document.getElementById('saveEvent').onclick = async ()=>{
 };
 document.getElementById('lockEvent').onclick = async ()=>{
   state.event.locked = !state.event.locked;
+  setupOpenSticky = !state.event.locked; // keep panel open when unlocked; close when locked
   await postState();
 };
 document.getElementById('resetEvent').onclick = async ()=>{
@@ -527,7 +585,7 @@ async function hostVote(kind){
       const e=await res.json().catch(()=>({error:'vote_failed'}));
       if(e.error==='already_voted'){ alert('Only one vote per device per singer/song on this device.'); }
     }
-  }catch(e){ /* offline voting ignore */ }
+  }catch(e){}
 }
 document.getElementById('hv_encore').onclick = ()=>hostVote('encore');
 document.getElementById('hv_another').onclick = ()=>hostVote('another');
@@ -545,12 +603,10 @@ async function concludeVoting(){
   const nowISO = new Date().toISOString();
   if(cur){
     if(winner==='maybe'){
-      // remove from rotation (red)
       state.singers=state.singers.filter(s=>s.id!==cur.id);
       state.winners.maybe.unshift({when:nowISO, name:cur.name, song:state.current.songArtist||''});
       state.winners.maybe = state.winners.maybe.slice(0,200);
     } else {
-      // keep with status dot
       cur._color=(winner==='encore'?'green':'yellow');
       state.winners[winner].unshift({when:nowISO, name:state.current.name, song:state.current.songArtist||''});
       state.winners[winner]=state.winners[winner].slice(0,200);
@@ -560,7 +616,6 @@ async function concludeVoting(){
   state.current = { id:null, name:'', songArtist:'' };
 
   await postState(); announce(winner);
-
   sfx.stopOpen();
   if (winner === 'encore') setTimeout(()=>sfx.playEncore(),120);
   else if (winner === 'maybe') setTimeout(()=>sfx.playLoser(),120);
@@ -620,15 +675,8 @@ document.getElementById('play_encore').onclick = async ()=>{ await sfx.forceEnab
 document.getElementById('play_loser').onclick  = async ()=>{ await sfx.forceEnable(); sfx.playLoser(); };
 
 /* ---------- INIT ---------- */
-(function spinningTitle(){ // helps keep TVs awake
-  const base = document.title || 'Encore! • Host';
-  const frames = ['·','•','●','•'];
-  let i=0;
-  setInterval(()=>{ document.title = base + ' ' + frames[i++ % frames.length]; }, 2000);
-})();
-(function dateFallback(){
-  const i=eventDate; if(i && i.type!=='date'){ i.placeholder='YYYY-MM-DD'; }
-})();
+(function spinningTitle(){ const base = document.title || 'Encore! • Host'; const frames = ['·','•','●','•']; let i=0; setInterval(()=>{ document.title = base + ' ' + frames[i++ % frames.length]; }, 2000); })();
+(function dateFallback(){ const i=eventDate; if(i && i.type!=='date'){ i.placeholder='YYYY-MM-DD'; }})();
 (async function init(){ await fetchState(); render(); loop(); })();
 </script>
 </body>
