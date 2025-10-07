@@ -16,12 +16,12 @@
   .wrap{min-height:100svh;display:flex;flex-direction:column;gap:16px;padding:24px}
 
   .head{text-align:center}
-  .welcome{font-size:28px;margin:0;color:#ffe8ff;opacity:.95}
+  .welcome{font-size:28px;margin:0;color:var(--green);opacity:.95} /* green */
   .venue{font-family:"Bebas Neue";font-size:66px;letter-spacing:1px;margin:2px 0 0}
-  .host{font-size:26px;margin:4px 0 0;color:var(--muted)}
+  .host{font-size:26px;margin:4px 0 0;color:var(--yellow)}          /* yellow */
 
   .now{margin-top:28px;text-align:center}
-  .nowLbl{font-family:"Bebas Neue";font-size:42px;margin:0;color:#ffe8ff}
+  .nowLbl{font-family:"Bebas Neue";font-size:42px;margin:0;color:var(--green)} /* green */
   .nowName{font-family:"Bebas Neue";font-size:64px;margin:10px 0 0}
 
   .voteTop{display:flex;justify-content:space-between;align-items:flex-start;margin-top:10px}
@@ -108,13 +108,16 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 window.addEventListener('focus', requestWakeLock);
 requestWakeLock();
 
-/* Tiny RAF nudge so some TVs don’t sleep */
+/* Tiny RAF nudge */
 let rafId; function tick(){ if (performance.now()%3000 < 16){ document.body.style.setProperty('--nudge', String(Math.random())); } rafId=requestAnimationFrame(tick); }
 rafId=requestAnimationFrame(tick);
 
 /* Time & state */
 let state=null,lastCounts={encore:0,another:0,maybe:0},clockOffset=0;
 let prevPhase='idle';
+let overlayTokenShown='';   // "kind|name|when"
+let overlayHideTimer=null;
+
 function nowMs(){return Date.now()+clockOffset}
 function smoothOffset(o){if(!isFinite(o))return;clockOffset=0.9*clockOffset+0.1*o}
 
@@ -135,7 +138,7 @@ function setHeader(){
 }
 function setNow(name){ $('#nowName').textContent = name || '—'; }
 
-/* Vote balls animation */
+/* Balls */
 function spawn(col, kind, n=1){
   const el=$(col); const W=el.clientWidth, H=el.clientHeight;
   const cls = kind==='encore'?'g':kind==='another'?'y':'r';
@@ -182,7 +185,7 @@ function stepConfetti(){
 function resize(){ confettiCanvas.width=innerWidth; confettiCanvas.height=innerHeight; }
 addEventListener('resize', resize);
 
-/* Overlay (visual only; sounds come from Host laptop) */
+/* Overlay */
 function showOverlay(kind, name){
   const ov=$('#overlay'), card=$('#ovCard'), title=$('#ovTitle'), sub=$('#ovSub');
   card.className='ovCard '+(kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
@@ -196,7 +199,8 @@ function showOverlay(kind, name){
   ov.style.display='flex';
   if(kind==='encore') startConfetti(); else stopConfetti();
 
-  setTimeout(()=>{ ov.style.display='none'; stopConfetti(); }, 15000);
+  clearTimeout(overlayHideTimer);
+  overlayHideTimer = setTimeout(()=>{ ov.style.display='none'; stopConfetti(); }, 15000);
 }
 
 /* --- RENDER --- */
@@ -208,12 +212,12 @@ function render(){
   const open = !!state?.voting?.open;
   const prep = (!open && (state?.voting?.prepUntil||0) > t);
   const endsAt = state?.voting?.endsAt || 0;
-  const hadResult = !!state?.voting?.lastResult;
+  const lastResult = state?.voting?.lastResult || null;
 
   let phase='idle';
   if(prep) phase='prep';
   else if(open) phase='open';
-  else if(hadResult) phase='result';
+  else if(lastResult) phase='result';
 
   const header=$('#header'), nowBlock=$('#nowBlock'), votingArea=$('#votingArea');
   if(phase==='prep' || phase==='open'){
@@ -255,9 +259,12 @@ function render(){
     if(cm>lastCounts.maybe)   spawn('#colM','maybe',   cm-lastCounts.maybe);
     lastCounts={encore:ce,another:ca,maybe:cm};
   } else if(phase==='result'){
-    const kind = state?.voting?.lastResult;
-    const nameForOverlay = curName || '';
-    if(kind){ showOverlay(kind, nameForOverlay); }
+    // Build a token so we only show overlay once per result
+    const token = `${lastResult}|${curName}|${state.serverUpdatedAt||0}`;
+    if(token && token !== overlayTokenShown){
+      overlayTokenShown = token;
+      showOverlay(lastResult, curName);
+    }
   }
 
   prevPhase = phase;
