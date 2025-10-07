@@ -1,4 +1,4 @@
-name: Deploy to SiteGround (SFTP)
+name: Deploy (SFTP - native)
 
 on:
   push:
@@ -8,26 +8,68 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Write private key to file
+      - name: Write private key
         run: |
           umask 077
-          mkdir -p $HOME/.ssh
-          echo "${{ secrets.SG_SSH_KEY }}" > $HOME/.ssh/sg_key
-          chmod 600 $HOME/.ssh/sg_key
+          mkdir -p "$HOME/.ssh"
+          echo "${{ secrets.SG_SSH_KEY }}" > "$HOME/.ssh/sg_key"
+          chmod 600 "$HOME/.ssh/sg_key"
 
-      - name: SFTP deploy
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
-        with:
-          server: ${{ secrets.SG_HOST }}
-          port: ${{ secrets.SG_PORT }}
-          username: ${{ secrets.SG_USER }}
-          ssh_private_key: $HOME/.ssh/sg_key
-          local_path: ./
-          remote_path: ${{ secrets.SG_REMOTE_PATH }}
-          sftp_only: true
-          delete_remote_files: false
+      # OPTIONAL: show what we are about to upload
+      - name: List local tree (top-level)
+        run: |
+          ls -la
+          echo "----"
+          find . -maxdepth 2 -type d -printf "%p\n" | sort
+
+      - name: SFTP upload selected folders/files
+        shell: bash
+        env:
+          HOST: ${{ secrets.SG_HOST }}
+          PORT: ${{ secrets.SG_PORT }}
+          USER: ${{ secrets.SG_USER }}
+          REMOTE: ${{ secrets.SG_REMOTE_PATH }}
+        run: |
+          set -euo pipefail
+
+          # EDIT THIS LIST if needed (these are your site folders/files)
+          TO_UPLOAD_DIRS=("assets" "host" "vote" "screen" "board" "reports")
+          TO_UPLOAD_FILES=("index.html")
+
+          # Build sftp batch script dynamically so we see exactly what's happening
+          BATCH="$(mktemp)"
+          {
+            echo "cd $REMOTE"
+            echo "pwd"
+            echo "ls -la"
+            # Make sure target dirs exist (mkdir fails if present; sftp keeps going)
+            for d in "${TO_UPLOAD_DIRS[@]}"; do
+              if [ -d "$d" ]; then
+                echo "mkdir $d"
+              fi
+            done
+            # Upload directories (recursive)
+            for d in "${TO_UPLOAD_DIRS[@]}"; do
+              if [ -d "$d" ]; then
+                echo "put -r $d"
+              fi
+            done
+            # Upload single files at root
+            for f in "${TO_UPLOAD_FILES[@]}"; do
+              if [ -f "$f" ]; then
+                echo "put $f"
+              fi
+            done
+            echo "ls -la"
+            echo "bye"
+          } > "$BATCH"
+
+          echo "=== SFTP batch ==="
+          cat "$BATCH"
+          echo "=================="
+
+          /usr/bin/sftp -o StrictHostKeyChecking=no -P "$PORT" -i "$HOME/.ssh/sg_key" "$USER@$HOST" < "$BATCH"
