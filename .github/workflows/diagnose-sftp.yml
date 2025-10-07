@@ -1,0 +1,22 @@
+name: SG Connection Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write SSH key
+        shell: bash
+        run: |
+          echo "${{ secrets.SG_SSH_KEY }}" > sg_key_raw
+          tr -d '\r' < sg_key_raw > sg_key
+          chmod 600 sg_key
+
+      - name: SSH: whoami, pwd, ls target
+        shell: bash
+        run: |
+          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SG_PORT }}" -i sg_key \
+            "${{ secrets.SG_USERNAME }}@${{ secrets.SG_SERVER }}" \
+            "whoami && pwd && ls -la /home/customer/www/vote.earnyourencorekaraoke.com/public_html || (echo 'Target missing'; exit 1)"
