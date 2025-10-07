@@ -70,6 +70,11 @@
   details.setup .body{padding:12px 16px 16px}
   .right .tinyPad{margin-top:6px}
   .soundList{display:grid;grid-template-columns:1fr;gap:8px}
+
+  /* host vote feedback */
+  .btn.voted { outline: 3px solid rgba(255,255,255,.5); transform: translateY(-1px); }
+  #hostVotedMsg { font-size: 12px; color: #e9dbff; margin-top: 4px; min-height: 16px; }
+  .voteBtnsDisabled button { opacity: .55; pointer-events: none; }
   .callout{animation:pulse 1.2s ease-in-out infinite;box-shadow:0 0 0 0 rgba(37,211,102,.55)}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(37,211,102,.55);transform:scale(1)}70%{box-shadow:0 0 0 18px rgba(37,211,102,0);transform:scale(1.02)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0);transform:scale(1)}}
 </style>
@@ -84,25 +89,22 @@
 
   <main class="mid">
     <details class="setup" id="setupPanel" open>
-      <summary>Event Setup</summary>
+      <summary>
+        Event Setup
+        <span class="tiny" id="lockHint" style="margin-left:8px;opacity:.8">(click to collapse/expand)</span>
+      </summary>
       <div class="body">
         <div class="row">
           <div>
-            <div class="sublabel">Venue Name</div>
-            <input id="venue" list="venuesList" placeholder="Venue Name" />
+            <div class="sublabel">Venue (Internal) – e.g. “Venue - City”</div>
+            <input id="venue" list="venuesList" placeholder="Venue - City" />
             <datalist id="venuesList"></datalist>
           </div>
           <div>
-            <div class="sublabel">Venue City</div>
-            <input id="venueCity" list="venuesCityList" placeholder="City" />
-            <datalist id="venuesCityList"></datalist>
+            <div class="sublabel">Public Venue Name (Screen) – e.g. “Public Venue Name”</div>
+            <input id="venuePublic" list="venuesPublicList" placeholder="Public Venue Name" />
+            <datalist id="venuesPublicList"></datalist>
           </div>
-        </div>
-
-        <div style="margin-top:8px">
-          <div class="sublabel">Public Venue Name (shown on Screen/Vote)</div>
-          <input id="venuePublic" list="venuesPublicList" placeholder="Public Venue Name" />
-          <datalist id="venuesPublicList"></datalist>
         </div>
 
         <div class="row" style="margin-top:8px">
@@ -126,7 +128,7 @@
             <div class="sublabel">Event PIN</div>
             <div class="row" style="grid-template-columns:1fr auto;gap:8px">
               <input id="pin" type="password" inputmode="numeric" placeholder="4–6 digits" />
-              <button id="togglePin" class="btn" aria-pressed="false" aria-controls="pin">Show</button>
+              <button id="togglePin" class="btn">Show</button>
             </div>
             <div id="pinSaved" class="tiny" style="height:16px;margin-top:4px"></div>
           </div>
@@ -189,28 +191,7 @@
                 </div>
               </div>
 
-              <!-- Public tally snapshot on Host -->
-              <div class="divider"></div>
-              <div class="miniRow">
-                <div>
-                  <div class="miniLbl">Encore!</div>
-                  <div id="miniE" class="miniWhite"></div>
-                </div>
-                <div>
-                  <div class="miniLbl">Another Shot!</div>
-                  <div id="miniA" class="miniWhite"></div>
-                </div>
-                <div>
-                  <div class="miniLbl">Maybe Next Time!</div>
-                  <div id="miniM" class="miniWhite"></div>
-                </div>
-              </div>
-              <div class="tally">
-                <div class="chip enc">Encore! <b id="cE" style="margin-left:8px">0</b></div>
-                <div class="chip ano">Another Shot! <b id="cA" style="margin-left:8px">0</b></div>
-                <div class="chip may">Maybe Next Time! <b id="cM" style="margin-left:8px">0</b></div>
-              </div>
-
+              <div id="hostVotedMsg"></div>
             </div>
           </div>
 
@@ -222,6 +203,27 @@
           <button id="hv_encore"  class="btn start">Encore!</button>
           <button id="hv_another" class="btn extend">Another Shot!</button>
           <button id="hv_maybe"   class="btn end">Maybe Next Time!</button>
+        </div>
+
+        <div class="miniRow" style="margin-top:14px">
+          <div>
+            <div class="miniLbl">Encore!</div>
+            <div id="miniE" class="miniWhite"></div>
+          </div>
+          <div>
+            <div class="miniLbl">Another Shot!</div>
+            <div id="miniA" class="miniWhite"></div>
+          </div>
+          <div>
+            <div class="miniLbl">Maybe Next Time!</div>
+            <div id="miniM" class="miniWhite"></div>
+          </div>
+        </div>
+
+        <div class="tally">
+          <div class="chip enc">Encore! <b id="c_encore" style="margin-left:8px">0</b></div>
+          <div class="chip ano">Another Shot! <b id="c_another" style="margin-left:8px">0</b></div>
+          <div class="chip may">Maybe Next Time! <b id="c_maybe" style="margin-left:8px">0</b></div>
         </div>
       </div>
     </div>
@@ -241,7 +243,7 @@
       <div class="tiny tinyPad" id="soundStatus">Sound: <b>off</b></div>
       <div class="tiny" id="loopStatus">Loop: <b>stopped</b></div>
       <div class="divider"></div>
-      <div class="sectionTitle white" style="margin-top:0">Sounds</div>
+      <div class="sectionTitle white" style="margin-top:0">Sounds (test)</div>
       <div class="soundList">
         <button id="play_open"   class="btn start">Voting</button>
         <button id="play_encore" class="btn start">Encore!</button>
@@ -252,77 +254,20 @@
 </div>
 
 <script>
-/* ---------- CONFIG ---------- */
 const GET_URL  = '/assets/get_state.php';
 const POST_URL = '/assets/state.php';
 const VOTE_URL = '/assets/vote.php';
 const PERF_URL = '/assets/submit_performance.php';
 
-/* ---------- UTIL ---------- */
 function debounce(fn, wait=300){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),wait); }; }
 const $=s=>document.querySelector(s);
 const digitsOnly = s => (s||'').replace(/\D+/g,'');
 
-/* ---------- CLOCK OFFSET ---------- */
 let clockOffset = 0;
 function nowMs(){ return Date.now() + clockOffset; }
 function smoothOffset(observed){ if(!isFinite(observed)) return; clockOffset = 0.9*clockOffset + 0.1*observed; }
 
-/* ---------- STATE ---------- */
 let state=null, poll=null;
-let useLocalFallback=false;
-const LKEY='eyek_state';
-
-/* do NOT force-open/close setup on every render; we only toggle when user clicks */
-let setupOpenSticky = true;
-
-/* ---------- FETCH ---------- */
-async function fetchState(){
-  try{
-    const r=await fetch(GET_URL,{cache:'no-store'});
-    const fetchedAt = Date.now();
-    if(!r.ok) throw new Error('GET failed');
-    state=await r.json();
-    useLocalFallback=false;
-    if(state && typeof state.serverNow === 'number'){
-      smoothOffset(state.serverNow - fetchedAt);
-    }
-  }catch(e){
-    useLocalFallback=true;
-    state = JSON.parse(localStorage.getItem(LKEY)||'{}');
-  }
-  normalizeState();
-}
-
-function normalizeState(){
-  state=state||{};
-  state.event   ||= {venue:'',venueCity:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false};
-  state.saved   ||= {venues:[], venuesCity:[], venuesPublic:[], kjs:[]};
-  state.singers ||= [];
-  state.current ||= {id:null,name:'',songArtist:''};
-  state.voting  ||= {open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}};
-  state.winners ||= {encore:[], another:[], maybe:[]};
-}
-
-async function postState(){
-  normalizeState();
-  if(useLocalFallback){
-    localStorage.setItem(LKEY, JSON.stringify(state));
-  }else{
-    await fetch(POST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
-  }
-  await fetchState();
-}
-const postStateDebounced = debounce(async ()=>{
-  if(useLocalFallback){
-    localStorage.setItem(LKEY, JSON.stringify(state));
-  }else{
-    await fetch(POST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
-  }
-  await fetchState(); render();
-}, 220);
-
-/* ---------- EDIT GUARDS ---------- */
 const lastEdit = Object.create(null);
 const RECENT_MS = 12000;
 function markEdit(id){ lastEdit[id] = Date.now(); }
@@ -330,125 +275,24 @@ function canUpdateField(el, id){ if(document.activeElement === el) return false;
 let pollPaused=false, resumeTimer=null;
 function pausePolling(){ pollPaused=true; clearTimeout(resumeTimer); }
 function resumePollingSoon(){ clearTimeout(resumeTimer); resumeTimer=setTimeout(()=>{ pollPaused=false; }, 1800); }
-
 let suppressEventRenderUntil = 0;
 function suppressEventRender(ms=1200){ suppressEventRenderUntil = Date.now() + ms; }
 function mayRenderEventInputs(){ return Date.now() > suppressEventRenderUntil; }
 
-/* ---------- ELEMENTS ---------- */
-const venue=$('#venue'), venueCity=$('#venueCity'), venuePublic=$('#venuePublic'), eventDate=$('#eventDate'), kj=$('#kj'), hostName=$('#hostName'), pin=$('#pin');
-const venuesList=document.getElementById('venuesList'), venuesCityList=document.getElementById('venuesCityList'), venuesPublicList=document.getElementById('venuesPublicList'), kjsList=document.getElementById('kjsList');
+const venue=$('#venue'), venuePublic=$('#venuePublic'), eventDate=$('#eventDate'), kj=$('#kj'), hostName=$('#hostName'), pin=$('#pin');
+const venuesList=document.getElementById('venuesList'), kjsList=document.getElementById('kjsList');
 const singerName=$('#singerName'), songArtist=$('#songArtist');
 const singerList=$('#singerList');
 const currentName=$('#currentName'), currentSongArtist=$('#currentSongArtist');
-const timerEl=$('#timer'), resultTag=$('#resultTag');
+const timerEl=$('#timer'), cE=$('#c_encore'), cA=$('#c_another'), cM=$('#c_maybe'), resultTag=$('#resultTag');
 const pinSaved=$('#pinSaved'); const togglePin=$('#togglePin');
-const cE=$('#cE'), cA=$('#cA'), cM=$('#cM');
 
-/* ---------- INPUT BEHAVIOR ---------- */
-[venue, venueCity, venuePublic, eventDate, kj, hostName, pin].forEach(el=>{
+[venue, venuePublic, eventDate, kj, hostName, pin].forEach(el=>{
   el.addEventListener('focusin', ()=>{ pausePolling(); markEdit(el.id); });
   el.addEventListener('focusout', resumePollingSoon);
   el.addEventListener('input', ()=>{ markEdit(el.id); pausePolling(); });
 });
 
-/* ---------- DATALISTS ---------- */
-function updateDatalistsImmediate(){
-  const Lvenues  = JSON.parse(localStorage.getItem('eyek_saved_venues') || '[]');
-  const Lcities  = JSON.parse(localStorage.getItem('eyek_saved_venues_city') || '[]');
-  const Lpubs    = JSON.parse(localStorage.getItem('eyek_saved_venues_public') || '[]');
-  const Lkjs     = JSON.parse(localStorage.getItem('eyek_saved_kjs') || '[]');
-
-  const venues   = [...new Set([...(state.saved.venues||[]), ...Lvenues])];
-  const cities   = [...new Set([...(state.saved.venuesCity||[]), ...Lcities])];
-  const pubs     = [...new Set([...(state.saved.venuesPublic||[]), ...Lpubs])];
-  const kjs      = [...new Set([...(state.saved.kjs||[]),    ...Lkjs])];
-
-  venuesList.innerHTML       = venues.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
-  venuesCityList.innerHTML   = cities.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
-  venuesPublicList.innerHTML = pubs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
-  kjsList.innerHTML          = kjs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
-}
-function pushLocalList(key, val){
-  val=(val||'').trim(); if(!val) return;
-  const map = { venue:'eyek_saved_venues', venueCity:'eyek_saved_venues_city', venuePublic:'eyek_saved_venues_public', kj:'eyek_saved_kjs' };
-  const k = map[key] || 'eyek_saved_kjs';
-  const arr = JSON.parse(localStorage.getItem(k) || '[]');
-  const next = [val, ...arr.filter(x=>x.toLowerCase()!==val.toLowerCase())].slice(0,50);
-  localStorage.setItem(k, JSON.stringify(next));
-  updateDatalistsImmediate();
-}
-
-/* ---------- RENDER ---------- */
-let lastCounts = { encore:0, another:0, maybe:0 };
-
-function render(){
-  if(!state) return;
-  updateDatalistsImmediate();
-
-  const canPaint = mayRenderEventInputs();
-  if (canPaint && canUpdateField(venue,'venue'))             venue.value        = state.event.venue || '';
-  if (canPaint && canUpdateField(venueCity,'venueCity'))     venueCity.value    = state.event.venueCity || '';
-  if (canPaint && canUpdateField(venuePublic,'venuePublic')) venuePublic.value  = state.event.venuePublic || '';
-  if (canPaint && canUpdateField(eventDate,'eventDate'))     eventDate.value    = state.event.date || new Date().toISOString().slice(0,10);
-  if (canPaint && canUpdateField(kj,'kj'))                   kj.value           = state.event.kj || '';
-  if (canPaint && canUpdateField(hostName,'hostName'))       hostName.value     = state.event.hostName || '';
-  if (canPaint && canUpdateField(pin,'pin'))                 pin.value          = state.event.pin || '';
-
-  const disabled = state.event.locked;
-  [venue,venueCity,venuePublic,eventDate,kj,hostName,pin].forEach(el=>el.disabled=disabled);
-
-  // keep the panel open/closed based on the last user action only
-  document.getElementById('setupPanel').open = setupOpenSticky && !disabled ? true : (!setupOpenSticky ? false : true);
-
-  // rotation list
-  singerList.innerHTML='';
-  (state.singers||[]).forEach(s=>{
-    const row=document.createElement('div'); row.className='pill';
-    const dot=document.createElement('div'); dot.className='dot '+(s._color||'');
-    const name=document.createElement('div'); name.className='nameTag'; name.textContent=s.name;
-    const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px';
-    const setB=document.createElement('button'); setB.className='btn start'; setB.textContent='Set'; setB.onclick=()=>setCurrent(s.id);
-    const rmB=document.createElement('button'); rmB.className='btn warn'; rmB.textContent='Remove'; rmB.onclick=()=>removeSinger(s.id);
-    actions.append(setB,rmB); row.append(dot,name,actions); singerList.append(row);
-  });
-
-  currentName.textContent=state.current.name||'—';
-  currentSongArtist.disabled=!state.current.id;
-  if(canUpdateField(currentSongArtist,'currentSongArtist')) currentSongArtist.value=state.current.songArtist||'';
-
-  const tNow = nowMs();
-  if(!state.voting.open && (state.voting.prepUntil||0) > tNow){
-    const ms = state.voting.prepUntil - tNow;
-    timerEl.textContent = 'Get ready: '+fmt(ms);
-    resultTag.textContent='—'; resultTag.className='resultTag';
-  } else if(state.voting.open){
-    const ms=Math.max(0, (state.voting.endsAt||0)-tNow);
-    timerEl.textContent=fmt(ms);
-    resultTag.textContent='Voting…'; resultTag.className='resultTag';
-  } else {
-    timerEl.textContent='00:00'; announce(state.voting.lastResult);
-  }
-
-  // live tallies on host
-  const ce=state?.voting?.counts?.encore||0, ca=state?.voting?.counts?.another||0, cm=state?.voting?.counts?.maybe||0;
-  cE.textContent=ce; cA.textContent=ca; cM.textContent=cm;
-
-  // spawn mini-dots when counts increase
-  if(ce>lastCounts.encore)  spawnMini('#miniE','encore',  ce-lastCounts.encore);
-  if(ca>lastCounts.another) spawnMini('#miniA','another', ca-lastCounts.another);
-  if(cm>lastCounts.maybe)   spawnMini('#miniM','maybe',   cm-lastCounts.maybe);
-  lastCounts={encore:ce,another:ca,maybe:cm};
-}
-function fmt(ms){ const s=Math.ceil(ms/1000); const m=Math.floor(s/60), r=s%60; return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` }
-function announce(w){
-  if(!w){ resultTag.textContent='—'; resultTag.className='resultTag'; return;}
-  if(w==='encore'){ resultTag.textContent='Encore!'; resultTag.className='resultTag r-encore'; }
-  else if(w==='another'){ resultTag.textContent='Another Shot!'; resultTag.className='resultTag r-another'; }
-  else { resultTag.textContent='Maybe Next Time'; resultTag.className='resultTag r-maybe'; }
-}
-
-/* mini-dots */
 function spawnMini(containerSel, kind, n=1){
   const box=$(containerSel); if(!box) return;
   const cls = kind==='encore'?'g':kind==='another'?'y':'r';
@@ -469,7 +313,106 @@ function spawnMini(containerSel, kind, n=1){
   }
 }
 
-/* ---------- BINDINGS ---------- */
+let lastCounts = { encore:0, another:0, maybe:0 };
+
+async function fetchState(){
+  const r=await fetch(GET_URL,{cache:'no-store'});
+  const serverFetchedAt = Date.now();
+  state=await r.json();
+  if(state && typeof state.serverNow === 'number'){
+    const observed = state.serverNow - serverFetchedAt;
+    if(clockOffset === 0) clockOffset = observed; else smoothOffset(observed);
+  }
+  state.event   ||= {venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false};
+  state.saved   ||= {venues:[], venuesPublic:[], kjs:[]};
+  state.singers ||= []; state.current ||= {id:null,name:'',songArtist:''};
+  state.voting  ||= {open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}};
+  state.winners ||= {encore:[], another:[], maybe:[]};
+}
+async function postState(){ await fetch(POST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)}); await fetchState(); }
+const postStateDebounced = debounce(async ()=>{
+  await fetch(POST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
+  await fetchState(); render();
+}, 220);
+
+function updateDatalistsImmediate(){
+  const Lvenues = JSON.parse(localStorage.getItem('eyek_saved_venues') || '[]');
+  const Lpub    = JSON.parse(localStorage.getItem('eyek_saved_venues_public') || '[]');
+  const Lkjs    = JSON.parse(localStorage.getItem('eyek_saved_kjs') || '[]');
+  const venues = [...new Set([...(state.saved.venues||[]), ...Lvenues])];
+  const pubs   = [...new Set([...(state.saved.venuesPublic||[]), ...Lpub])];
+  const kjs    = [...new Set([...(state.saved.kjs||[]),    ...Lkjs])];
+  venuesList.innerHTML = venues.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
+  document.getElementById('venuesPublicList').innerHTML = pubs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
+  kjsList.innerHTML    = kjs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
+}
+function pushLocalList(key, val){
+  val=(val||'').trim(); if(!val) return;
+  const k = key==='venue' ? 'eyek_saved_venues'
+          : key==='venuePublic' ? 'eyek_saved_venues_public'
+          : 'eyek_saved_kjs';
+  const arr = JSON.parse(localStorage.getItem(k) || '[]');
+  const next = [val, ...arr.filter(x=>x.toLowerCase()!==val.toLowerCase())].slice(0,50);
+  localStorage.setItem(k, JSON.stringify(next));
+  updateDatalistsImmediate();
+}
+
+function render(){
+  if(!state) return;
+  updateDatalistsImmediate();
+
+  const canPaint = mayRenderEventInputs();
+  if (canPaint && canUpdateField(venue,'venue'))                venue.value       = state.event.venue || '';
+  if (canPaint && canUpdateField(venuePublic,'venuePublic'))    venuePublic.value = state.event.venuePublic || '';
+  if (canPaint && canUpdateField(eventDate,'eventDate'))        eventDate.value   = state.event.date || new Date().toISOString().slice(0,10);
+  if (canPaint && canUpdateField(kj,'kj'))                      kj.value          = state.event.kj || '';
+  if (canPaint && canUpdateField(hostName,'hostName'))          hostName.value    = state.event.hostName || '';
+  if (canPaint && canUpdateField(pin,'pin'))                    pin.value         = state.event.pin || '';
+  const disabled = state.event.locked;
+  [venue,venuePublic,eventDate,kj,hostName,pin].forEach(el=>el.disabled=disabled);
+
+  document.getElementById('lockEvent').textContent = disabled ? 'Unlock' : 'Lock';
+  document.getElementById('setupPanel').open = !disabled;
+
+  singerList.innerHTML='';
+  (state.singers||[]).forEach(s=>{
+    const row=document.createElement('div'); row.className='pill';
+    const dot=document.createElement('div'); dot.className='dot '+(s._color||'');
+    const name=document.createElement('div'); name.className='nameTag'; name.textContent=s.name;
+    const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px';
+    const setB=document.createElement('button'); setB.className='btn start'; setB.textContent='Set'; setB.onclick=()=>setCurrent(s.id);
+    const rmB=document.createElement('button'); rmB.className='btn warn'; rmB.textContent='Remove'; rmB.onclick=()=>removeSinger(s.id);
+    actions.append(setB,rmB); row.append(dot,name,actions); singerList.append(row);
+  });
+
+  currentName.textContent=state.current.name||'—';
+  currentSongArtist.disabled=!state.current.id;
+  if(canUpdateField(currentSongArtist,'currentSongArtist')) currentSongArtist.value=state.current.songArtist||'';
+
+  const ce=state.voting.counts.encore||0, ca=state.voting.counts.another||0, cm=state.voting.counts.maybe||0;
+  cE.textContent=ce; cA.textContent=ca; cM.textContent=cm;
+
+  const tNow = nowMs();
+  if(!state.voting.open && (state.voting.prepUntil||0) > tNow){
+    const ms = state.voting.prepUntil - tNow;
+    timerEl.textContent = 'Get ready: '+fmt(ms);
+    resultTag.textContent='—'; resultTag.className='resultTag';
+  } else if(state.voting.open){
+    const ms=Math.max(0, (state.voting.endsAt||0)-tNow);
+    timerEl.textContent=fmt(ms);
+    resultTag.textContent='Voting…'; resultTag.className='resultTag';
+  } else {
+    timerEl.textContent='00:00'; announce(state.voting.lastResult);
+  }
+}
+function fmt(ms){ const s=Math.ceil(ms/1000); const m=Math.floor(s/60), r=s%60; return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` }
+function announce(w){
+  if(!w){ resultTag.textContent='—'; resultTag.className='resultTag'; return;}
+  if(w==='encore'){ resultTag.textContent='Encore!'; resultTag.className='resultTag r-encore'; }
+  else if(w==='another'){ resultTag.textContent='Another Shot!'; resultTag.className='resultTag r-another'; }
+  else { resultTag.textContent='Maybe Next Time'; resultTag.className='resultTag r-maybe'; }
+}
+
 function bindLive(el, key, transform=(x)=>x, immediate=false){
   const handler = async ()=>{
     if(!state?.event) return;
@@ -482,14 +425,9 @@ function bindLive(el, key, transform=(x)=>x, immediate=false){
   };
   el.addEventListener('input', handler);
   el.addEventListener('change', handler);
-  el.addEventListener('blur', ()=>{
-    if(key==='venue'||key==='venueCity'||key==='venuePublic'||key==='kj'){
-      pushLocalList(key, el.value);
-    }
-  });
+  el.addEventListener('blur', ()=>{ if(key==='venue'||key==='venuePublic'||key==='kj'){ pushLocalList(key, el.value); }});
 }
 bindLive(venue,       'venue');
-bindLive(venueCity,   'venueCity');
 bindLive(venuePublic, 'venuePublic');
 bindLive(eventDate,   'date');
 bindLive(kj,          'kj');
@@ -497,32 +435,24 @@ bindLive(hostName,    'hostName');
 bindLive(pin,         'pin', digitsOnly, true);
 
 function showPinSaved(key){ if(key!=='pin') return; pinSaved.textContent='PIN saved'; setTimeout(()=>pinSaved.textContent='',1200); }
-togglePin.onclick = ()=>{
-  const isPwd = pin.type==='password';
-  pin.type = isPwd ? 'text' : 'password';
-  togglePin.textContent = isPwd ? 'Hide' : 'Show';
-  togglePin.setAttribute('aria-pressed', String(isPwd));
-};
+togglePin.onclick = ()=>{ pin.type = (pin.type==='password'?'text':'password'); togglePin.textContent = (pin.type==='password'?'Show':'Hide'); };
 
-/* ---------- BUTTONS ---------- */
 document.getElementById('saveEvent').onclick = async ()=>{
   pushLocalList('venue', venue.value);
-  pushLocalList('venueCity', venueCity.value);
   pushLocalList('venuePublic', venuePublic.value);
   pushLocalList('kj', kj.value);
   await postState(); const m=document.getElementById('eventSavedMsg'); m.textContent='Saved!'; setTimeout(()=>m.textContent='',1400);
 };
 document.getElementById('lockEvent').onclick = async ()=>{
   state.event.locked = !state.event.locked;
-  setupOpenSticky = !state.event.locked; // keep panel open when unlocked; close when locked
   await postState();
 };
 document.getElementById('resetEvent').onclick = async ()=>{
   if(state.event.locked){ alert('Unlock to reset.'); return;}
   if(!confirm('Reset this event? This clears singers & votes.')) return;
   state={ serverUpdatedAt: Date.now()/1000|0,
-    event:{venue:'',venueCity:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false},
-    saved:{venues: state.saved?.venues ?? [], venuesCity: state.saved?.venuesCity ?? [], venuesPublic: state.saved?.venuesPublic ?? [], kjs: state.saved?.kjs ?? []},
+    event:{venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false},
+    saved:{venues: state.saved?.venues ?? [], kjs: state.saved?.kjs ?? [], venuesPublic: state.saved?.venuesPublic ?? []},
     singers:[], current:{id:null,name:'',songArtist:''},
     voting:{open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}},
     winners:{encore:[], another:[], maybe:[]}
@@ -575,21 +505,44 @@ document.getElementById('extendVote').onclick = async ()=>{
 };
 document.getElementById('endVote').onclick = async ()=>{ await concludeVoting(); };
 
+/* host vote with feedback + one-device highlight */
+const hvE = document.getElementById('hv_encore');
+const hvA = document.getElementById('hv_another');
+const hvM = document.getElementById('hv_maybe');
+const hostVotedMsg = document.getElementById('hostVotedMsg');
 function deviceId(){ let id=localStorage.getItem('eyek_device_id'); if(!id){ id=crypto.randomUUID(); localStorage.setItem('eyek_device_id', id);} return id; }
+function lockVoteButtons() { hvE.parentElement.classList.add('voteBtnsDisabled'); }
+function unlockVoteButtons() { hvE.parentElement.classList.remove('voteBtnsDisabled'); [hvE,hvA,hvM].forEach(b=>b.classList.remove('voted')); hostVotedMsg.textContent = ''; }
+
 async function hostVote(kind){
   if(!state?.voting?.open) return;
-  try{
-    const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice:kind, deviceId:deviceId()})});
-    await fetchState(); render();
-    if(!res.ok){
-      const e=await res.json().catch(()=>({error:'vote_failed'}));
-      if(e.error==='already_voted'){ alert('Only one vote per device per singer/song on this device.'); }
+  [hvE,hvA,hvM].forEach(b=>b.classList.remove('voted'));
+  const btn = kind==='encore'?hvE:kind==='another'?hvA:hvM;
+  btn.classList.add('voted');
+  hostVotedMsg.textContent = 'Voted: ' + (kind==='encore'?'Encore!':kind==='another'?'Another Shot!':'Maybe Next Time!');
+  lockVoteButtons();
+
+  const res = await fetch(VOTE_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({choice:kind, deviceId:deviceId()})
+  });
+
+  await fetchState(); render();
+
+  if(!res.ok){
+    const e = await res.json().catch(()=>({error:'vote_failed'}));
+    if(e.error==='already_voted'){
+      hostVotedMsg.textContent = 'Already voted this round on this device.';
+    } else {
+      hostVotedMsg.textContent = 'Vote failed. Please try again.';
+      unlockVoteButtons();
     }
-  }catch(e){}
+  }
 }
-document.getElementById('hv_encore').onclick = ()=>hostVote('encore');
-document.getElementById('hv_another').onclick = ()=>hostVote('another');
-document.getElementById('hv_maybe').onclick  = ()=>hostVote('maybe');
+hvE.onclick = ()=>hostVote('encore');
+hvA.onclick = ()=>hostVote('another');
+hvM.onclick  = ()=>hostVote('maybe');
 
 async function concludeVoting(){
   if(!state.voting.open){ announce(state.voting.lastResult); return; }
@@ -616,35 +569,13 @@ async function concludeVoting(){
   state.current = { id:null, name:'', songArtist:'' };
 
   await postState(); announce(winner);
+
   sfx.stopOpen();
   if (winner === 'encore') setTimeout(()=>sfx.playEncore(),120);
   else if (winner === 'maybe') setTimeout(()=>sfx.playLoser(),120);
 }
 
-/* ---------- POLL LOOP ---------- */
-function loop(){
-  if(poll) clearInterval(poll);
-  poll=setInterval(async ()=>{
-    if(pollPaused) return;
-    await fetchState();
-    const t=nowMs();
-    if(!state.voting.open && (state.voting.prepUntil||0) > 0 && t >= state.voting.prepUntil){
-      state.voting.open = true;
-      state.voting.prepUntil = 0;
-      state.voting.endsAt = t + 30000;
-      await postState();
-      sfx.startLoop();
-    }
-    if(state?.voting?.open && t>=state.voting.endsAt){
-      await concludeVoting();
-    } else {
-      render();
-      if(state.voting.open) sfx.ensureLoop(); else sfx.stopOpen();
-    }
-  }, 1000);
-}
-
-/* ---------- AUDIO ---------- */
+/* audio */
 const sfx = (function(){
   let enabled=false;
   const aOpen   = new Audio('/assets/voting_open.mp3'); aOpen.loop = true; aOpen.preload='auto';
@@ -674,10 +605,34 @@ document.getElementById('play_open').onclick   = async ()=>{ await sfx.forceEnab
 document.getElementById('play_encore').onclick = async ()=>{ await sfx.forceEnable(); sfx.playEncore(); };
 document.getElementById('play_loser').onclick  = async ()=>{ await sfx.forceEnable(); sfx.playLoser(); };
 
-/* ---------- INIT ---------- */
-(function spinningTitle(){ const base = document.title || 'Encore! • Host'; const frames = ['·','•','●','•']; let i=0; setInterval(()=>{ document.title = base + ' ' + frames[i++ % frames.length]; }, 2000); })();
-(function dateFallback(){ const i=eventDate; if(i && i.type!=='date'){ i.placeholder='YYYY-MM-DD'; }})();
-(async function init(){ await fetchState(); render(); loop(); })();
+function loop(){
+  if(poll) clearInterval(poll);
+  poll=setInterval(async ()=>{
+    if(pollPaused) return;
+    await fetchState();
+    const t=nowMs();
+    if(!state.voting.open && (state.voting.prepUntil||0) > 0 && t >= state.voting.prepUntil){
+      state.voting.open = true;
+      state.voting.prepUntil = 0;
+      state.voting.endsAt = t + 30000;
+      await postState();
+      sfx.startLoop();
+    }
+    if(state?.voting?.open && t>=state.voting.endsAt){
+      await concludeVoting();
+    } else {
+      render();
+      if(state.voting.open) sfx.ensureLoop(); else sfx.stopOpen();
+    }
+  }, 1000);
+}
+
+/* init */
+(async function init(){
+  await fetchState();
+  render();
+  loop();
+})();
 </script>
 </body>
 </html>
