@@ -23,13 +23,14 @@
   .btnG{background:var(--green);color:#042a13}
   .btnY{background:var(--yellow);color:#352600}
   .btnR{background:var(--red);color:#2b0e12}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
   .tally{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   .chip{padding:10px 18px;border-radius:999px;border:2px solid rgba(255,255,255,.15);font-weight:900}
   .enc{background:var(--green);color:#072a14}
   .ano{background:var(--yellow);color:#352600}
   .may{background:var(--red);color:#2b0e12}
 
-  /* result overlay similar to screen but text-only & silent */
+  /* result overlay */
   .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.8);z-index:50}
   .ovCard{width:min(800px,92vw);text-align:center;border:3px solid rgba(255,255,255,.18);border-radius:22px;padding:26px}
   .ovTitle{font-size:74px;margin:0}
@@ -46,6 +47,7 @@
     <div class="sub" id="now">—</div>
   </div>
 
+  <!-- Gate shows ONLY until PIN verified; after that it stays hidden -->
   <div id="gate">
     <div class="sub">Enter event PIN to vote</div>
     <div class="pin" style="margin-top:8px">
@@ -55,11 +57,12 @@
     <div id="msg" class="sub" style="margin-top:6px"></div>
   </div>
 
+  <!-- Vote area is always visible once unlocked; buttons enable during an active round -->
   <div id="vote" style="display:none">
     <div class="row">
-      <button id="vE" class="btnG">Encore!</button>
-      <button id="vA" class="btnY">Another Shot!</button>
-      <button id="vM" class="btnR">Maybe Next Time!</button>
+      <button id="vE" class="btn btnG">Encore!</button>
+      <button id="vA" class="btn btnY">Another Shot!</button>
+      <button id="vM" class="btn btnR">Maybe Next Time!</button>
     </div>
     <div class="tally" style="margin-top:12px">
       <div class="chip enc">Encore! <b id="cE">0</b></div>
@@ -70,7 +73,7 @@
 </div>
 
 <!-- results overlay -->
-<div id="overlay" class="overlay">
+<div id="overlay" class="overlay" aria-live="polite">
   <div id="ovCard" class="ovCard">
     <div id="ovTitle" class="ovTitle">Encore!</div>
     <p id="ovSub" class="ovSub">Congratulations, —</p>
@@ -78,81 +81,153 @@
 </div>
 
 <script>
-const GET_URL='/assets/get_state.php';
-const VOTE_URL='/assets/vote.php';
+/* --- config endpoints --- */
+const GET_URL = '/assets/get_state.php';
+const VOTE_URL = '/assets/vote.php';
+
+/* --- helpers --- */
 const $=s=>document.querySelector(s);
 let state=null, clockOffset=0;
-let overlayTimer=null, lastResultShown=null;
-
 function nowMs(){return Date.now()+clockOffset}
 function smoothOffset(o){ if(!isFinite(o)) return; clockOffset=0.9*clockOffset+0.1*o; }
 function deviceId(){ let id=localStorage.getItem('eyek_device_id'); if(!id){ id=crypto.randomUUID(); localStorage.setItem('eyek_device_id', id);} return id; }
 
-async function fetchState(){
-  const r=await fetch(GET_URL,{cache:'no-store'}); const fetchedAt=Date.now(); state=await r.json();
-  if(state && typeof state.serverNow==='number'){ smoothOffset(state.serverNow - fetchedAt); }
-  render();
+/* --- unlock persistence --- */
+function unlockKeyFor(st){ return (st?.event?.pin||'') + '|' + (st?.event?.date||''); }
+function isUnlocked(st){
+  const k = unlockKeyFor(st);
+  return localStorage.getItem('eyek_vote_unlocked') === k;
 }
-setInterval(fetchState,1000); fetchState();
+function setUnlocked(st, yes){
+  const k = unlockKeyFor(st);
+  if(yes) localStorage.setItem('eyek_vote_unlocked', k);
+  else localStorage.removeItem('eyek_vote_unlocked');
+}
 
+/* --- overlay management --- */
+let overlayTimer=null;
+let lastResultTokenShown=''; // `${kind}|${name}|${eventDate}`
+function showOverlay(kind, name){
+  const ov=$('#overlay'), card=$('#ovCard');
+  const title = kind==='encore'?'Encore!':(kind==='another'?'Another Shot!':'Maybe Next Time!');
+  $('#ovTitle').textContent = title;
+
+  const clean = String(name||'').replace(/\.\s*$/,'');
+  $('#ovSub').textContent = (kind==='maybe')
+    ? (clean?`Thanks, ${clean}!`:'Thanks for singing!')
+    : (clean?`Congratulations, ${clean}!`:'Congratulations!');
+
+  card.className = 'ovCard ' + (kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
+
+  ov.style.display='flex';
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(()=>{ ov.style.display='none'; }, 15000);
+}
+function hideOverlay(){ $('#overlay').style.display='none'; clearTimeout(overlayTimer); }
+
+/* --- polling --- */
+async function fetchState(){
+  try{
+    const r=await fetch(GET_URL,{cache:'no-store'});
+    const fetchedAt=Date.now();
+    state=await r.json();
+    if(typeof state.serverNow==='number'){ smoothOffset(state.serverNow - fetchedAt); }
+    render();
+  }catch(e){}
+}
+setInterval(fetchState, 1000); fetchState();
+
+/* --- render --- */
+let lastSingerName=''; // to know when a new singer is set
 function render(){
-  $('#venue').textContent = (state?.event?.venuePublic||'—');
+  // header/status text
+  $('#venue').textContent = (state?.event?.venuePublic || '—');
+
   const open = !!state?.voting?.open;
-  const t=nowMs(); const prep = (!open && (state?.voting?.prepUntil||0) > t);
-  const name = (state?.current?.name||'').trim();
+  const t=nowMs();
+  const prep = (!open && (state?.voting?.prepUntil||0) > t);
+  const endsAt = state?.voting?.endsAt || 0;
+  const nm = (state?.current?.name || '').trim();
 
-  $('#now').textContent = prep ? (name?`Get ready to vote for: ${name}`:'Get ready to vote…')
-                      : open ? (name?`Now voting for: ${name}`:'Now voting!')
-                      : '—';
+  // status line
+  $('#now').textContent = prep ? (nm?`Get ready to vote for: ${nm}`:'Get ready to vote…')
+                        : open ? (nm?`Now voting for: ${nm}`:'Now voting!')
+                        : (nm?`Now singing: ${nm}`:'—');
 
-  $('#gate').style.display = (open || prep) ? 'none':'block';
-  $('#vote').style.display = (open || prep) ? 'block':'none';
-
+  // tally always visible once unlocked
   $('#cE').textContent = state?.voting?.counts?.encore||0;
   $('#cA').textContent = state?.voting?.counts?.another||0;
   $('#cM').textContent = state?.voting?.counts?.maybe||0;
 
-  // results overlay (silent)
-  if(!open && !prep && state?.voting?.lastResult){
-    const kind=state.voting.lastResult;
-    if(kind!==lastResultShown){
-      const title = kind==='encore'?'Encore!':(kind==='another'?'Another Shot!':'Maybe Next Time!');
-      const nm = (name||'').replace(/\.\s*$/,'') || '';
-      const sub = kind==='maybe' ? (nm?`Thanks, ${nm}!`:'Thanks for singing!')
-                                 : (nm?`Congratulations, ${nm}!`:'Congratulations!');
-      showOverlay(kind, title, sub);
-      lastResultShown=kind;
+  // gate / vote visibility based on persistent unlock
+  const unlocked = isUnlocked(state);
+  $('#gate').style.display = unlocked ? 'none' : 'block';
+  $('#vote').style.display = unlocked ? 'block' : 'none';
+
+  // enable/disable buttons based on open state
+  const canVote = unlocked && open;
+  for (const id of ['vE','vA','vM']){
+    const b = $('#'+id);
+    b.disabled = !canVote;
+  }
+
+  // overlay logic:
+  // - never show during prep/open
+  // - show ONCE per (kind|name|date) when a result exists and we’re idle
+  if(prep || open){
+    hideOverlay();
+  }else{
+    const kind = state?.voting?.lastResult || '';
+    if(kind){
+      // include date to avoid showing old result after date changes
+      const token = `${kind}|${nm}|${state?.event?.date||''}`;
+      if(token !== lastResultTokenShown){
+        showOverlay(kind, nm);
+        lastResultTokenShown = token;
+      }
+    }else{
+      hideOverlay();
+      lastResultTokenShown='';
     }
   }
-}
-function showOverlay(kind, title, sub){
-  const ov=$('#overlay'), card=$('#ovCard');
-  document.getElementById('ovTitle').textContent=title;
-  document.getElementById('ovSub').textContent=sub;
-  card.className='ovCard '+(kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
-  ov.style.display='flex';
-  clearTimeout(overlayTimer);
-  overlayTimer=setTimeout(()=>{ ov.style.display='none'; }, 15000);
-}
 
-$('#unlock').onclick = async ()=>{
-  const pin = $('#pin').value.trim();
-  if(!pin){ $('#msg').textContent='Enter a PIN.'; return; }
-  const ok = pin === (state?.event?.pin||'');
-  $('#msg').textContent = ok ? 'Unlocked.' : 'Wrong PIN.';
-  if(ok) { $('#gate').style.display='none'; $('#vote').style.display='block'; }
-};
-
-async function send(choice){
-  if(!(state?.voting?.open)) return;
-  const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice,deviceId:deviceId()})});
-  if(!res.ok){
-    const e=await res.json().catch(()=>({error:'vote_failed'}));
-    if(e.error==='already_voted'){ alert('You already voted this round.'); }
+  // if singer changed, allow future result overlays to show
+  if(nm !== lastSingerName){
+    lastSingerName = nm;
+    // no immediate overlay action here; we’ll react when lastResult flips later
   }
 }
-$('#vE').onclick=()=>send('encore'); $('#vA').onclick=()=>send('another'); $('#vM').onclick=()=>send('maybe');
+
+/* --- unlock flow --- */
+$('#unlock').onclick = ()=>{
+  const pinInput = $('#pin').value.trim();
+  const correct = pinInput === (state?.event?.pin||'');
+  $('#msg').textContent = correct ? 'Unlocked.' : 'Wrong PIN.';
+  if(correct){
+    setUnlocked(state, true);
+    $('#gate').style.display='none';
+    $('#vote').style.display='block';
+  }
+};
+
+/* --- send vote --- */
+async function send(choice){
+  if(!(state?.voting?.open)) return; // safety
+  try{
+    const res=await fetch(VOTE_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({choice, deviceId:deviceId()})
+    });
+    if(!res.ok){
+      const e=await res.json().catch(()=>({error:'vote_failed'}));
+      if(e.error==='already_voted'){ alert('You already voted this round.'); }
+    }
+  }catch(e){}
+}
+$('#vE').onclick=()=>send('encore');
+$('#vA').onclick=()=>send('another');
+$('#vM').onclick=()=>send('maybe');
 </script>
 </body>
 </html>
-<!-- FILE: /vote/index.html -->
