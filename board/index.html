@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <title>Encore! • Board</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Hourly auto-refresh as a last resort to “wake” Silk -->
+<meta http-equiv="refresh" content="3600">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -15,14 +17,27 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);font:18px/1.35 "Montserrat",system-ui}
   .wrap{min-height:100svh;display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:24px}
-  .col{border:2px solid rgba(255,255,255,.15);border-radius:16px;padding:16px;display:flex;flex-direction:column;min-height:calc(100svh - 48px);background:linear-gradient(180deg,var(--deep1),var(--deep2))}
-  .title{font-family:"Bebas Neue";font-size:112px;text-align:center;margin:6px 0 6px}
+  .col{
+    border:2px solid rgba(255,255,255,.15);border-radius:16px;padding:16px;
+    display:flex;flex-direction:column;min-height:calc(100svh - 48px);
+    background:linear-gradient(180deg,var(--deep1),var(--deep2))
+  }
+  /* Smaller, responsive headings */
+  .title{font-family:"Bebas Neue";font-size:clamp(36px,6vw,64px);text-align:center;margin:6px 0 10px}
   .enc{color:var(--green); text-shadow:0 0 24px rgba(37,211,102,.35)}
   .ano{color:var(--yellow); text-shadow:0 0 24px rgba(246,201,69,.35)}
-  .list{flex:1;display:flex;flex-direction:column;gap:14px;overflow:hidden}
-  .row{font-size:44px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1)}
-  #heartbeat{position:fixed;width:1px;height:1px;left:-10px;top:-10px;background:transparent;transform:translateX(0);will-change:transform;animation:hb 2s linear infinite}
-  @keyframes hb{0%{transform:translateX(0)}50%{transform:translateX(1px)}100%{transform:translateX(0)}}
+
+  /* More rows visible */
+  .list{flex:1;display:flex;flex-direction:column;gap:10px;overflow:auto;scrollbar-width:thin}
+  .row{
+    font-size:clamp(18px,2.2vw,28px);
+    padding:8px 12px;border-radius:10px;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1)
+  }
+  .song{font-size:0.6em;color:var(--muted);margin-left:8px}
+
+  /* Off-screen heartbeat pixel */
+  #heartbeat{position:fixed;width:1px;height:1px;left:-10px;top:-10px;background:transparent}
 </style>
 </head>
 <body>
@@ -40,20 +55,50 @@
 </div>
 
 <script>
+/* --- CONFIG / ENDPOINTS --- */
 const GET_URL='/assets/get_state.php';
 const $=s=>document.querySelector(s);
 
-/* Keep the screen awake */
+/* --- Wake Lock (where supported) --- */
 let wakeLock=null;
 async function requestWakeLock(){ try{ if('wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); } }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') requestWakeLock(); });
 window.addEventListener('focus', requestWakeLock);
 requestWakeLock();
 
-/* Tiny heartbeat animation for preventing sleep */
-let rafId; function tick(){ if (performance.now()%3000 < 16){ document.body.style.setProperty('--nudge', String(Math.random())); } rafId=requestAnimationFrame(tick); }
-rafId=requestAnimationFrame(tick);
+/* --- “Don’t sleep” helpers for Silk/TVs --- */
+/* 1) Constant tiny DOM change via requestAnimationFrame */
+(function heartbeatRAF(){
+  const hb = $('#heartbeat');
+  let i = 0;
+  function tick(){
+    // toggle a style each frame to indicate activity
+    hb.style.transform = (i++ % 2) ? 'translateX(1px)' : 'translateX(0)';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
 
+/* 2) Title spinner — keeps activity even if tab is backgrounded */
+(function spinningTitle(){
+  const base = 'Encore! • Board';
+  const frames = ['·','•','●','•'];
+  let idx = 0;
+  setInterval(()=>{ document.title = base + ' ' + frames[idx++ % frames.length]; }, 2000);
+})();
+
+/* 3) Periodic no-op audio context “ping” (safe if blocked) */
+let ac=null;
+setInterval(()=>{
+  try{
+    if(!ac){ ac = new (window.AudioContext||window.webkitAudioContext)(); }
+    const o = ac.createOscillator(), g = ac.createGain();
+    g.gain.value = 0.00001; o.connect(g).connect(ac.destination);
+    o.start(); o.stop(ac.currentTime+0.02);
+  }catch(e){/* ignore if blocked */}
+}, 30000);
+
+/* --- State fetch + render --- */
 function parseWhen(w){ const t=Date.parse(w||''); return isNaN(t)?0:t; }
 
 async function fetchState(){
@@ -63,9 +108,9 @@ async function fetchState(){
 
     const enc = st?.winners?.encore || [];
     const ano = st?.winners?.another || [];
-    const may = st?.winners?.maybe  || []; // ← new stream captured by Host
+    const may = st?.winners?.maybe  || []; // “maybe” removes a singer from board
 
-    // Build a map: latest status per singer name
+    // Build latest status per singer name
     const latest = new Map(); // name -> {kind, when, song}
     function ingest(arr, kind){
       for(const it of arr){
@@ -76,31 +121,27 @@ async function fetchState(){
     }
     ingest(enc,'encore'); ingest(ano,'another'); ingest(may,'maybe');
 
-    // Split into Encore/Another lists, excluding those whose latest is "maybe"
     const listEnc=[], listAno=[];
     for(const [name,info] of latest.entries()){
-      if(info.kind==='maybe') continue; // remove from board
-      if(info.kind==='encore') listEnc.push({name, song:info.song, when:info.when});
-      else if(info.kind==='another') listAno.push({name, song:info.song, when:info.when});
+      if(info.kind==='maybe') continue;
+      const item={name, song:info.song, when:info.when};
+      if(info.kind==='encore') listEnc.push(item); else listAno.push(item);
     }
-
-    // Sort most recent first (optional, looks nice)
     listEnc.sort((a,b)=>b.when-a.when);
     listAno.sort((a,b)=>b.when-a.when);
 
     function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
     function render(listEl, arr){
       listEl.innerHTML = arr.length
-        ? arr.map(it=>`<div class="row">${escapeHtml(it.name)} <span style="font-size:20px;color:var(--muted);margin-left:8px">${escapeHtml(it.song||'')}</span></div>`).join('')
+        ? arr.map(it=>`<div class="row">${escapeHtml(it.name)}<span class="song">${escapeHtml(it.song||'')}</span></div>`).join('')
         : '<div class="row" style="opacity:.5">—</div>';
     }
     render($('#encList'), listEnc);
     render($('#anoList'), listAno);
-  }catch(e){ /* ignore temporary network issues */ }
+  }catch(e){/* ignore transient errors */}
 }
-setInterval(fetchState, 1500);
+setInterval(fetchState, 2000);
 fetchState();
 </script>
 </body>
 </html>
-<!-- FILE: /board/index.html -->
