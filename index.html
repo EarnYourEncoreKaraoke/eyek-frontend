@@ -1,79 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Earn Your Encore Karaoke</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Earn Your Encore Karaoke • Control Hub</title>
+  <meta name="color-scheme" content="dark light" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #3b0066, #5b0099);
-      color: white;
-      text-align: center;
-      margin: 0;
-      padding: 0;
+    :root{
+      --bg1:#2a0050; --bg2:#52008f;
+      --card:#250042; --ink:#ffffff; --muted:#e7d9ff;
+      --accent:#ffcc00; --btn:#ff6a00; --btnH:#ff8a33;
+      --ring:#00d1ff;
     }
-    header {
-      padding: 30px 20px 10px;
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font:18px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--ink);
+      background:linear-gradient(135deg,var(--bg1),var(--bg2)) fixed;
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
     }
-    header h1 {
-      margin: 0;
-      font-size: 2.5rem;
+    .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center}
+    header{width:100%;max-width:1100px;padding:32px 20px 8px;text-align:center}
+    h1{margin:0;font-size:clamp(28px,4.5vw,56px)}
+    h2{margin:10px 0 0;font-weight:600;font-size:clamp(16px,2.2vw,22px);color:var(--accent)}
+    .grid{
+      width:100%;max-width:1100px;
+      display:grid;gap:18px;padding:26px 20px 12px;
+      grid-template-columns:1fr; 
     }
-    header h2 {
-      margin: 10px 0 0;
-      font-weight: 400;
-      font-size: 1.2rem;
-      color: #ffcc00;
+    @media (min-width:680px){ .grid{grid-template-columns:1fr 1fr} }
+    @media (min-width:1000px){ .grid{grid-template-columns:1fr 1fr 1fr} }
+
+    a.tile{
+      display:flex;align-items:center;justify-content:center;
+      min-height:92px;text-decoration:none;color:#fff;
+      background:linear-gradient(180deg, var(--btn), #ff5500);
+      border-radius:14px;border:2px solid rgba(255,255,255,.18);
+      box-shadow:0 8px 30px rgba(0,0,0,.35);
+      font-weight:800;font-size:clamp(18px,2.6vw,24px);
+      letter-spacing:.2px; text-align:center;
+      transition:transform .12s ease, background .12s ease, box-shadow .12s ease;
+      outline: none;
     }
-    .menu {
-      margin-top: 50px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      align-items: center;
+    a.tile:hover{ background:linear-gradient(180deg, var(--btnH), #ff5f12); transform:translateY(-2px) }
+    a.tile:active{ transform:translateY(0) scale(.99) }
+    a.tile:focus-visible{ box-shadow:0 0 0 4px rgba(0,209,255,.55), 0 8px 30px rgba(0,0,0,.35); border-color:rgba(255,255,255,.35) }
+
+    .note{color:var(--muted);opacity:.95;text-align:center;padding:8px 20px}
+    .card{
+      margin-top:8px;background:linear-gradient(180deg,var(--card),rgba(0,0,0,.15));
+      border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:14px 18px;
+      max-width:1100px;width:calc(100% - 40px);
     }
-    .menu a {
-      display: inline-block;
-      padding: 15px 30px;
-      font-size: 1.2rem;
-      font-weight: bold;
-      color: white;
-      background: #ff6600;
-      border-radius: 10px;
-      text-decoration: none;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-      transition: transform 0.2s, background 0.2s;
-    }
-    .menu a:hover {
-      background: #ff8533;
-      transform: scale(1.05);
-    }
-    footer {
-      margin-top: 60px;
-      padding: 15px;
-      font-size: 0.9rem;
-      color: #ccc;
+    footer{margin:18px 0 28px;color:#d7c9ff;font-size:14px;text-align:center}
+    .smallLinks{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+    .smallLinks a{color:#d7c9ff;text-decoration:none;border-bottom:1px dotted rgba(255,255,255,.4)}
+    .smallLinks a:hover{color:#fff;border-color:#fff}
+    @media (prefers-reduced-motion: reduce){
+      a.tile{transition:none}
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>🎤 Earn Your Encore Karaoke</h1>
-    <h2>Select a Page Below</h2>
-  </header>
+  <div class="wrap">
+    <header>
+      <h1>🎤 Earn Your Encore Karaoke</h1>
+      <h2>Select a page to open on each screen</h2>
+    </header>
 
-  <div class="menu">
-    <a href="host/index.html">Host Page</a>
-    <a href="screen/index.html">Screen Display</a>
-    <a href="board/index.html">Encore Board</a>
-    <a href="vote/index.html">Voting Page</a>
-    <a href="reports/index.html">Reports</a>
-    <a href="assets/">Assets Folder</a>
+    <div class="grid">
+      <a class="tile" href="/host/">Host Page</a>
+      <a class="tile" href="/screen/">Screen Display</a>
+      <a class="tile" href="/board/">Encore Board</a>
+      <a class="tile" href="/vote/">Voting Page</a>
+      <a class="tile" href="/reports/">Reports</a>
+      <a class="tile" href="/assets/">Assets Folder</a>
+    </div>
+
+    <div class="card note" role="note" aria-label="usage tips">
+      Tip: on TVs, open this hub on each device and pick the page you want for that screen.  
+      Links use large tap targets and high contrast for easy use on remotes/browsers.
+    </div>
+
+    <footer>
+      <div>&copy; <span id="yr">2025</span> Earn Your Encore Karaoke</div>
+      <div class="smallLinks">
+        <a href="/host/">Host</a>
+        <a href="/screen/">Screen</a>
+        <a href="/board/">Board</a>
+        <a href="/vote/">Vote</a>
+      </div>
+    </footer>
   </div>
 
-  <footer>
-    &copy; 2025 Earn Your Encore Karaoke
-  </footer>
+  <script>
+    // Keep the year current automatically
+    document.getElementById('yr').textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
