@@ -1,4 +1,4 @@
-name: Deploy to SiteGround (SCP)
+name: Deploy to SiteGround (SFTP)
 
 on:
   push:
@@ -10,49 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # Write the private key from the secret and normalize line endings (CRLF -> LF)
-      - name: Write SSH key
-        shell: bash
+      - name: Write private key to file
         run: |
-          echo "${{ secrets.SG_SSH_KEY }}" > sg_key_raw
-          tr -d '\r' < sg_key_raw > sg_key
-          chmod 600 sg_key
+          umask 077
+          mkdir -p $HOME/.ssh
+          echo "${{ secrets.SG_SSH_KEY }}" > $HOME/.ssh/sg_key
+          chmod 600 $HOME/.ssh/sg_key
 
-      # Quick connectivity & path smoke test
-      - name: SSH: print whoami and target path
-        shell: bash
-        run: |
-          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SG_PORT }}" -i sg_key \
-            "${{ secrets.SG_USERNAME }}@${{ secrets.SG_SERVER }}" \
-            "whoami && pwd && ls -la /home/customer/www && ls -la /home/customer/www/vote.earnyourencorekaraoke.com || true"
-
-      # Make sure the subdomain's public_html exists
-      - name: SSH: ensure target directory exists
-        shell: bash
-        run: |
-          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SG_PORT }}" -i sg_key \
-            "${{ secrets.SG_USERNAME }}@${{ secrets.SG_SERVER }}" \
-            "mkdir -p /home/customer/www/vote.earnyourencorekaraoke.com/public_html"
-
-      # Deploy with SCP (exclude git and CI folders)
-      - name: Upload site via SCP
-        uses: appleboy/scp-action@v0.1.7
+      - name: SFTP deploy
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          host:     ${{ secrets.SG_SERVER }}
-          username: ${{ secrets.SG_USERNAME }}
-          key:      ${{ secrets.SG_SSH_KEY }}
-          port:     ${{ secrets.SG_PORT }}
-          source:   |
-            ./
-          target:   /home/customer/www/vote.earnyourencorekaraoke.com/public_html
-          overwrite: true
-          rm: false
-          recursive: true
-          # Exclude CI, git metadata, and local helper directory if present
-          exclude: |
-            .git/*
-            .github/*
-            _ci/*
+          server: ${{ secrets.SG_HOST }}
+          port: ${{ secrets.SG_PORT }}
+          username: ${{ secrets.SG_USER }}
+          ssh_private_key: $HOME/.ssh/sg_key
+          local_path: ./
+          remote_path: ${{ secrets.SG_REMOTE_PATH }}
+          sftp_only: true
+          delete_remote_files: false
