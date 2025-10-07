@@ -1,4 +1,4 @@
-name: Deploy to SiteGround (vote subdomain)
+name: Deploy to SiteGround (SFTP)
 
 on:
   push:
@@ -9,28 +9,32 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repo
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # Decode the base64 secret back into a proper private key file
-      - name: Decode SSH key
+      # Optional: fail early if any secret is missing
+      - name: Check required secrets
         run: |
-          echo "${{ secrets.SG_KEY_B64 }}" | base64 --decode > /tmp/sg_key
-          chmod 600 /tmp/sg_key
+          test -n "${{ secrets.SG_SERVER }}" || (echo "Missing SG_SERVER" && exit 1)
+          test -n "${{ secrets.SG_PORT }}" || (echo "Missing SG_PORT" && exit 1)
+          test -n "${{ secrets.SG_USERNAME }}" || (echo "Missing SG_USERNAME" && exit 1)
+          test -n "${{ secrets.SG_PRIVATE_KEY }}" || (echo "Missing SG_PRIVATE_KEY" && exit 1)
 
-      # Optional: verify remote path env for the next step
-      - name: Show target path
-        run: echo "Deploying to ${{ secrets.SG_REMOTE_PATH }}"
-
-      # Deploy everything in the repo to SiteGround via SFTP
-      - name: Deploy via SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+      # Deploy everything in the repo root to the SiteGround docroot for the subdomain
+      - name: SFTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.SG_SERVER }}
-          port: ${{ secrets.SG_PORT }}
           username: ${{ secrets.SG_USERNAME }}
-          ssh_private_key: /tmp/sg_key
-          local_path: "./"
-          remote_path: ${{ secrets.SG_REMOTE_PATH }}
-          sftp_only: true
-          delete_remote_files: false
+          protocol: sftp
+          port: ${{ secrets.SG_PORT }}
+          privateKey: ${{ secrets.SG_PRIVATE_KEY }}
+          local-dir: ./
+          server-dir: /home/customer/www/vote.earnyourencorekaraoke.com/public_html/
+          # keep remote files that aren’t in the repo (set true only if you want a nuke + full sync)
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/_ci/**
+            **/README.md
