@@ -1,0 +1,38 @@
+name: Diagnose SFTP to SiteGround
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write private key to file
+        run: |
+          echo "${{ secrets.SG_SSH_KEY }}" > sg_key
+          chmod 600 sg_key
+
+      - name: Show inputs (server & user only)
+        run: |
+          echo "SERVER=${{ secrets.SG_SERVER }}"
+          echo "USER=${{ secrets.SG_USERNAME }}"
+          echo "PORT=${{ secrets.SG_PORT }}"
+
+      - name: Test SSH connectivity (prints 'ok' on success)
+        run: |
+          ssh -o StrictHostKeyChecking=no -p "${{ secrets.SG_PORT }}" -i sg_key \
+            "${{ secrets.SG_USERNAME }}@${{ secrets.SG_SERVER }}" "echo ok"
+
+      - name: Test SFTP + list target directory
+        run: |
+          cat > sftp_batch.txt <<'EOF'
+          cd /home/customer/www/vote.earnyourencorekaraoke.com/public_html
+          pwd
+          ls -la
+          EOF
+
+          sftp -o StrictHostKeyChecking=no -P "${{ secrets.SG_PORT }}" -i sg_key \
+            "${{ secrets.SG_USERNAME }}@${{ secrets.SG_SERVER }}" < sftp_batch.txt
