@@ -52,9 +52,6 @@
 
   #heartbeat{position:fixed;width:1px;height:1px;left:-10px;top:-10px;background:transparent;transform:translateX(0);will-change:transform;animation:hb 2s linear infinite}
   @keyframes hb{0%{transform:translateX(0)}50%{transform:translateX(1px)}100%{transform:translateX(0)}}
-
-  .soundBtn{position:fixed;right:16px;bottom:16px;padding:12px 14px;border-radius:10px;border:0;font-weight:800;cursor:pointer;background:#25d366;color:#061b10}
-  .soundBtn.off{background:#6f52a8;color:#eee}
 </style>
 </head>
 <body>
@@ -93,8 +90,6 @@
   </section>
 </div>
 
-<button id="enableSound" class="soundBtn off" title="Enable sound on this screen">Enable sound</button>
-
 <div id="overlay" class="overlay">
   <div id="ovCard" class="ovCard">
     <div id="ovTitle" class="ovTitle">Encore!</div>
@@ -106,14 +101,14 @@
 const GET_URL='/assets/get_state.php';
 const $=s=>document.querySelector(s);
 
-/* Wake Lock */
+/* Wake Lock to keep TVs awake */
 let wakeLock=null;
 async function requestWakeLock(){ try{ if('wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); } }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') requestWakeLock(); });
 window.addEventListener('focus', requestWakeLock);
 requestWakeLock();
 
-/* Tiny RAF nudge */
+/* Tiny RAF nudge so some TVs don’t sleep */
 let rafId; function tick(){ if (performance.now()%3000 < 16){ document.body.style.setProperty('--nudge', String(Math.random())); } rafId=requestAnimationFrame(tick); }
 rafId=requestAnimationFrame(tick);
 
@@ -140,7 +135,7 @@ function setHeader(){
 }
 function setNow(name){ $('#nowName').textContent = name || '—'; }
 
-/* Balls */
+/* Vote balls animation */
 function spawn(col, kind, n=1){
   const el=$(col); const W=el.clientWidth, H=el.clientHeight;
   const cls = kind==='encore'?'g':kind==='another'?'y':'r';
@@ -187,7 +182,7 @@ function stepConfetti(){
 function resize(){ confettiCanvas.width=innerWidth; confettiCanvas.height=innerHeight; }
 addEventListener('resize', resize);
 
-/* Overlay */
+/* Overlay (visual only; sounds come from Host laptop) */
 function showOverlay(kind, name){
   const ov=$('#overlay'), card=$('#ovCard'), title=$('#ovTitle'), sub=$('#ovSub');
   card.className='ovCard '+(kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
@@ -199,25 +194,10 @@ function showOverlay(kind, name){
     : (cleanName ? `Congratulations, ${cleanName}!` : 'Congratulations!');
 
   ov.style.display='flex';
-  if(kind==='encore') startConfetti();
-  if(kind!=='encore') stopConfetti();
+  if(kind==='encore') startConfetti(); else stopConfetti();
 
-  // auto-hide overlay after 15s
   setTimeout(()=>{ ov.style.display='none'; stopConfetti(); }, 15000);
 }
-
-/* Sounds (enable once on this device) */
-let soundEnabled=false;
-const btnSound = document.getElementById('enableSound');
-const sEncore = new Audio('/assets/encore.mp3');
-const sLoser  = new Audio('/assets/loser.wav');
-async function warmUp(a){ try{ a.muted=true; await a.play(); a.pause(); a.currentTime=0; a.muted=false; }catch{} }
-btnSound.addEventListener('click', async ()=>{
-  try{
-    await warmUp(sEncore); await warmUp(sLoser);
-    soundEnabled=true; btnSound.classList.remove('off'); btnSound.textContent='Sound on';
-  }catch{}
-});
 
 /* --- RENDER --- */
 function render(){
@@ -258,7 +238,6 @@ function render(){
     $('#voteNow').textContent = curName ? `Get ready to vote for: ${curName}` : 'Get ready to vote…';
     $('#timer').textContent = fmt(Math.max(0,(state.voting.prepUntil||0) - t));
     $('#tally').style.display='none';
-    // reset columns at start of prep
     if(prevPhase!=='prep'){
       ['#colE','#colA','#colM'].forEach(s=>$(s).innerHTML = '<div class="label">'+(s==='#colE'?'Encore!':s==='#colA'?'Another Shot!':'Maybe Next Time!')+'</div>');
       lastCounts={encore:0,another:0,maybe:0};
@@ -277,8 +256,8 @@ function render(){
     lastCounts={encore:ce,another:ca,maybe:cm};
   } else if(phase==='result'){
     const kind = state?.voting?.lastResult;
-    const nameForOverlay = curName || ''; // show current name if present
-    if(kind){ showOverlay(kind, nameForOverlay); if(soundEnabled){ if(kind==='encore') sEncore.play().catch(()=>{}); else if(kind==='maybe') sLoser.play().catch(()=>{}); } }
+    const nameForOverlay = curName || '';
+    if(kind){ showOverlay(kind, nameForOverlay); }
   }
 
   prevPhase = phase;
