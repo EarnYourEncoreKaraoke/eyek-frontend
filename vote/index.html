@@ -1,15 +1,17 @@
+<!-- EYEK /vote v2025-10-08T22:30:00Z build 3 -->
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8" />
 <title>Encore! • Vote</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bgDeep1:#1B0930; --bgDeep2:#16072A;
-    --txt:#fff; --sub:#d8c7ff; --line:#6F52A8; --accent:#B692FF;
-    --green:#25d366; --yellow:#f6c945; --red:#ff5e6c;
+    --txt:#FFFFFF; --sub:#D8C7FF;
+    --line:#6F52A8; --accent:#B692FF;
+    --green:#25D366; --yellow:#F6C945; --red:#FF5E6C;
   }
   *{box-sizing:border-box}
   body{margin:0;background:linear-gradient(180deg,var(--bgDeep1),var(--bgDeep2));color:var(--txt);font:17px/1.4 "Montserrat",system-ui}
@@ -17,7 +19,7 @@
   h1{margin:0;font-size:28px}
   .sub{color:var(--sub)}
   .pin{display:grid;grid-template-columns:1fr auto;gap:8px}
-  input{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:#220d3f;color:#fff}
+  input{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:#220D3F;color:#fff}
   button{padding:12px 14px;border-radius:10px;border:0;font-weight:800;cursor:pointer}
   .btnG{background:var(--green);color:#042a13}
   .btnY{background:var(--yellow);color:#352600}
@@ -28,7 +30,7 @@
   .mini{font-size:12px}
   .msg{min-height:18px}
   .voteRow{display:grid;grid-template-columns:1fr;gap:10px}
-  .who{border:1px dashed rgba(255,255,255,.25);padding:10px;border-radius:10px;background:#210d3f}
+  .who{border:1px dashed rgba(255,255,255,.25);padding:10px;border-radius:10px;background:#210D3F}
   /* Overlay */
   #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;z-index:9998}
   #ovCard{padding:20px 18px;border-radius:16px;text-align:center;border:2px solid var(--line);background:linear-gradient(180deg,#1B0930,#16072A);min-width:270px}
@@ -105,68 +107,93 @@
 
 <script>
 /* ===== Core vote page (PHP backend) ===== */
-const GET_URL='/assets/get_state.php';
-const VOTE_URL='/assets/vote.php';
+const GET_URL = '/assets/get_state.php';
+const VOTE_URL = '/assets/vote.php';
 
-const $=s=>document.querySelector(s);
-const pin=$('#pin'), unlockBtn=$('#unlockBtn'), unlockMsg=$('#unlockMsg');
-const unlockSection=$('#unlock'), voteUI=$('#voteUI');
-const singerEl=$('#singer'), venueTitle=$('#venueTitle'), nowSinging=$('#nowSinging');
-let state=null, unlocked=false;
-let overlayTimer=null;
+const $ = s => document.querySelector(s);
+const pinEl = $('#pin'), unlockBtn = $('#unlockBtn'), unlockMsg = $('#unlockMsg');
+const unlockSection = $('#unlock'), voteUI = $('#voteUI');
+const singerEl = $('#singer'), venueTitle = $('#venueTitle'), nowSinging = $('#nowSinging');
+const vE=$('#vE'), vA=$('#vA'), vM=$('#vM'); const voteMsg=$('#voteMsg');
+
+let state = null, eventPin = '', currentSingerId = null, unlocked=false;
+let overlayTimer = null;
 
 function deviceId(){
   try{
-    const k='eyek_device'; let v=localStorage.getItem(k);
+    const k='eyek_device';
+    let v=localStorage.getItem(k);
     if(!v){ v='d_'+Math.random().toString(36).slice(2,11); localStorage.setItem(k,v); }
     return v;
   }catch(e){ return 'na_'+Math.random().toString(36).slice(2,7); }
 }
 
 async function fetchState(){
-  const r=await fetch(GET_URL,{cache:'no-store'}); state=await r.json().catch(()=>null);
-  const s=state||{}; const e=s.event||{}; const c=s.current||{};
+  const r = await fetch(GET_URL, { cache:'no-store' });
+  state = await r.json().catch(()=>null);
+  const s = state || {};
+  const e = s.event || {};
+  const c = s.current || {};
   venueTitle.textContent = e.venuePublic || e.venue || 'Encore! Vote';
   nowSinging.textContent = c.name ? ('Now singing: '+c.name) : '';
+  currentSingerId = c.id || null;
   singerEl.textContent = c.name || '—';
 }
 
-function setUnlocked(on){ unlockSection.classList.toggle('hidden', on); voteUI.classList.toggle('hidden', !on); unlocked=on; }
+function setUnlocked(on){
+  unlockSection.classList.toggle('hidden', on);
+  voteUI.classList.toggle('hidden', !on);
+  unlocked = on;
+}
 
 unlockBtn.addEventListener('click', async ()=>{
-  const p = (pin.value||'').trim(); if(!p){ unlockMsg.textContent='Enter the event PIN.'; return; }
+  eventPin = (pinEl.value||'').trim();
+  if(!eventPin){ unlockMsg.textContent='Enter the event PIN.'; return; }
   setUnlocked(true); unlockMsg.textContent='';
   await fetchState();
 });
 
-async function send(choice){
-  if(!(state?.voting?.open) || !unlocked) return;
-  const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice,deviceId:deviceId()})});
-  if(!res.ok){
-    const e=await res.json().catch(()=>({error:'vote_failed'}));
-    if(e.error==='already_voted'){ alert('You already voted this round.'); }
+async function sendVote(kind){
+  if(!unlocked){ voteMsg.textContent='Unlock with event PIN first.'; return; }
+  if(!currentSingerId){ voteMsg.textContent='No singer set yet.'; return; }
+  const body = { pin:eventPin, singer: currentSingerId, vote:kind, device: deviceId() };
+  try{
+    const r = await fetch(VOTE_URL,{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if(!r.ok){
+      const e=await r.json().catch(()=>({error:'vote_failed'}));
+      if((e.error||'').includes('already')){ showOverlay('another','Already Voted','One vote per device per singer'); }
+      else { showOverlay('maybe','Error','Please try again'); }
+      return;
+    }
+    showOverlay(kind, kind==='encore'?'Encore! Congratulations!':(kind==='another'?'Another Shot!':'Maybe Next Time!'), 'Vote received');
+  }catch(e){
+    showOverlay('maybe','Error','Please try again');
   }
+  await fetchState();
 }
-$('#vE').onclick=()=>send('encore'); $('#vA').onclick=()=>send('another'); $('#vM').onclick=()=>send('maybe');
-
-// overlay helpers
-function showOverlay(kind, title, sub){
-  const ov=$('#overlay'), card=$('#ovCard');
-  document.getElementById('ovTitle').textContent=title;
-  document.getElementById('ovSub').textContent=sub;
-  card.className='ovCard '+(kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
-  ov.style.display='flex';
-  clearTimeout(overlayTimer);
-  overlayTimer=setTimeout(()=>{ ov.style.display='none'; }, 15000);
-}
+vE.addEventListener('click', ()=>sendVote('encore'));
+vA.addEventListener('click', ()=>sendVote('another'));
+vM.addEventListener('click', ()=>sendVote('maybe'));
 
 setInterval(fetchState, 8000);
 fetchState();
+
+function showOverlay(kind, title, sub){
+  const ov = document.getElementById('overlay');
+  const card = document.getElementById('ovCard');
+  document.getElementById('ovTitle').textContent = title;
+  document.getElementById('ovSub').textContent = sub;
+  card.className = 'ovCard ' + (kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
+  ov.style.display = 'flex';
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(()=>{ ov.style.display = 'none'; }, 15000);
+}
 </script>
 
-<!-- Firebase config (must exist) -->
+<!-- Firebase config (must exist at site root) -->
 <script src="/firebase-config.js"></script>
-<!-- Audience coupon: read Firestore after PIN unlock; resolve Storage path to URL when needed -->
+
+<!-- Audience coupon: read from Firestore after PIN unlock; resolve Storage path to URL when needed -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js';
@@ -175,41 +202,80 @@ import { getStorage, ref, getDownloadURL } from 'https://www.gstatic.com/firebas
 
 const cfg = window.firebaseConfig;
 let app=null, auth=null, db=null, st=null;
-if(cfg){ app=initializeApp(cfg); auth=getAuth(app); db=getFirestore(app); st=getStorage(app); signInAnonymously(auth).catch(()=>{}); }
 
-const banner=document.getElementById('couponBanner');
-const imgEl=document.getElementById('couponImg');
-const textEl=document.getElementById('couponTextOut');
-const linkEl=document.getElementById('couponLinkOut');
-const closeBtn=document.getElementById('couponClose');
-let dismissed=false;
+if (cfg) {
+  app = initializeApp(cfg);
+  auth = getAuth(app);
+  db   = getFirestore(app);
+  st   = getStorage(app);
+  signInAnonymously(auth).catch(()=>{});
+} else {
+  console.warn('firebase-config.js missing or window.firebaseConfig not set.');
+}
+
+const banner   = document.getElementById('couponBanner');
+const imgEl    = document.getElementById('couponImg');
+const textEl   = document.getElementById('couponTextOut');
+const linkEl   = document.getElementById('couponLinkOut');
+const closeBtn = document.getElementById('couponClose');
+
+let dismissed = false;
 
 function isExpired(iso){ if(!iso) return false; const t=Date.parse(iso); return isNaN(t)?false:(Date.now()>t); }
+
+// Accept multiple possible fields; if only a Storage PATH exists, resolve to URL
 async function resolveImageUrl(data){
-  const direct=data?.couponImageUrl||data?.couponImageURL||data?.imageUrl||data?.imageURL||''; if(direct) return direct;
-  const path=data?.couponImagePath||data?.imagePath||''; if(!path||!st) return ''; try{ return await getDownloadURL(ref(st,path)); }catch{ return ''; }
+  const direct =
+    data?.couponImageUrl ||
+    data?.couponImageURL ||
+    data?.imageUrl ||
+    data?.imageURL || '';
+  if (direct) return direct;
+
+  const path = data?.couponImagePath || data?.imagePath || '';
+  if (!path || !st) return '';
+  try { return await getDownloadURL(ref(st, path)); }
+  catch { return ''; }
 }
-imgEl.addEventListener('load', ()=>{ imgEl.style.display='block'; });
-imgEl.addEventListener('error',()=>{ imgEl.style.display='none'; });
+
+// Ensure we only show the image once it actually loads
+imgEl.addEventListener('load',  ()=>{ imgEl.style.display = 'block'; });
+imgEl.addEventListener('error', ()=>{ imgEl.style.display = 'none'; });
 
 async function renderCoupon(data){
   const exp = data?.expiresAtISO || data?.expiresAt || '';
-  if(!data || !data.couponText || isExpired(exp) || dismissed){ banner.style.display='none'; return; }
+  if (!data || !data.couponText || isExpired(exp) || dismissed) {
+    banner.style.display = 'none';
+    return;
+  }
   textEl.textContent = data.couponText || '';
-  const url = await resolveImageUrl(data);
-  if(url){ imgEl.src=url; } else { imgEl.style.display='none'; imgEl.removeAttribute('src'); }
-  if(data.couponLink){ linkEl.href=data.couponLink; linkEl.style.display='inline'; } else { linkEl.style.display='none'; }
-  banner.style.display='flex';
-}
-closeBtn.addEventListener('click',()=>{ dismissed=true; banner.style.display='none'; });
 
+  const url = await resolveImageUrl(data);
+  if (url) { imgEl.src = url; } else { imgEl.style.display = 'none'; imgEl.removeAttribute('src'); }
+
+  if (data.couponLink) { linkEl.href = data.couponLink; linkEl.style.display = 'inline'; }
+  else { linkEl.style.display = 'none'; }
+
+  banner.style.display = 'flex';
+}
+
+closeBtn.addEventListener('click', ()=>{ dismissed = true; banner.style.display='none'; });
+
+// Hook after the existing PIN unlock button
 (function attachAfterUnlock(){
-  const pinInput=document.getElementById('pin'); const unlockBtn=document.getElementById('unlockBtn');
-  if(!pinInput||!unlockBtn||!db) return;
-  unlockBtn.addEventListener('click',()=>{
-    const pin=(pinInput.value||'').trim(); if(!pin) return;
-    const refDoc=doc(db,'events',String(pin),'promo','coupon');
-    onSnapshot(refDoc, async (ss)=>{ const data=ss.exists()?ss.data():null; await renderCoupon(data); }, ()=>{});
+  const pinInput  = document.getElementById('pin');
+  const unlockBtn = document.getElementById('unlockBtn');
+  if(!pinInput || !unlockBtn || !db) return;
+
+  unlockBtn.addEventListener('click', ()=>{
+    const pin = (pinInput.value || '').trim();
+    if(!pin) return;
+
+    const refDoc = doc(db, 'events', String(pin), 'promo', 'coupon');
+    onSnapshot(refDoc, async (ss)=>{
+      const data = ss.exists() ? ss.data() : null;
+      await renderCoupon(data);
+    }, ()=>{/* ignore audience read errors */});
   });
 })();
 </script>
