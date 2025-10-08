@@ -16,7 +16,7 @@ jobs:
           zip -r site-files.zip ./
 
       - name: Upload ZIP as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: site-files
           path: site-files.zip
