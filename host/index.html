@@ -287,6 +287,20 @@ let suppressEventRenderUntil = 0;
 function suppressEventRender(ms=1200){ suppressEventRenderUntil = Date.now() + ms; }
 function mayRenderEventInputs(){ return Date.now() > suppressEventRenderUntil; }
 
+/* NEW: keep setup panel open 30s “peek” when locked */
+let setupPeekUntil = 0;
+const setupPanel = document.getElementById('setupPanel');
+setupPanel.addEventListener('toggle', ()=>{
+  if (setupPanel.open && state?.event?.locked){
+    setupPeekUntil = Date.now() + 30000; // 30s grace
+  }
+});
+setupPanel.querySelector('summary').addEventListener('click', ()=>{
+  if (state?.event?.locked){
+    setupPeekUntil = Date.now() + 30000;
+  }
+});
+
 const venue=$('#venue'), venuePublic=$('#venuePublic'), eventDate=$('#eventDate'), kj=$('#kj'), hostName=$('#hostName'), pin=$('#pin');
 const adImageUrl=$('#adImageUrl'), adText=$('#adText');
 const venuesList=document.getElementById('venuesList'), kjsList=document.getElementById('kjsList');
@@ -302,6 +316,7 @@ const pinSaved=$('#pinSaved'); const togglePin=$('#togglePin');
   el.addEventListener('input', ()=>{ markEdit(el.id); pausePolling(); });
 });
 
+/* Mini-ball spawner */
 function spawnMini(containerSel, kind, n=1){
   const box=$(containerSel); if(!box) return;
   const cls = kind==='encore'?'g':kind==='another'?'y':'r';
@@ -373,6 +388,7 @@ function render(){
   updateDatalistsImmediate();
 
   const canPaint = mayRenderEventInputs();
+
   if (canPaint && canUpdateField(venue,'venue'))                venue.value       = state.event.venue || '';
   if (canPaint && canUpdateField(venuePublic,'venuePublic'))    venuePublic.value = state.event.venuePublic || '';
   if (canPaint && canUpdateField(eventDate,'eventDate'))        eventDate.value   = state.event.date || new Date().toISOString().slice(0,10);
@@ -383,11 +399,14 @@ function render(){
   if (canPaint && canUpdateField(adText,'adText'))              adText.value      = state.event.ad?.text || '';
 
   const disabled = !!state.event.locked;
+
   [venue,venuePublic,eventDate,kj,hostName,pin,adImageUrl,adText].forEach(el=>el.disabled=disabled);
 
-  // Keep panel OPEN whenever unlocked; only collapse when locked
+  // KEEP OPEN if unlocked OR within peek window
+  const shouldForceOpen = !disabled || (Date.now() < setupPeekUntil);
+  setupPanel.open = shouldForceOpen;
+
   document.getElementById('lockEvent').textContent = disabled ? 'Unlock' : 'Lock';
-  document.getElementById('setupPanel').open = !disabled;
 
   // rotation list
   singerList.innerHTML='';
@@ -503,7 +522,7 @@ async function logPerformance(action){
 }
 function setCurrent(id){
   const s = state.singers.find(x=>x.id===id); if(!s) return;
-  // FULL reset for the new round (prevents stray counts)
+  // FULL reset for the new round
   state.voting = { open:false, prepUntil:0, endsAt:0, extendCount:0,
                    counts:{encore:0,another:0,maybe:0}, lastResult:null, voters:{} };
   lastCounts = {encore:0,another:0,maybe:0};
@@ -541,14 +560,18 @@ document.getElementById('endVote').onclick = async ()=>{ await concludeVoting();
 
 function deviceId(){ let id=localStorage.getItem('eyek_device_id'); if(!id){ id=crypto.randomUUID(); localStorage.setItem('eyek_device_id', id);} return id; }
 async function hostVote(kind){
-  // guard: only when a round is open
   if(!(state?.voting?.open)) return;
-  // clear prior selection highlight
-  document.querySelectorAll('.voteBtn').forEach(b=>b.classList.remove('selected'));
-  // submit
+
+  // visual: drop a ball immediately on host
+  const map = {encore:'#miniE', another:'#miniA', maybe:'#miniM'};
+  spawnMini(map[kind], kind, 1);
+
+  // submit to server
   try{
     const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice:kind, deviceId:deviceId()})});
     if(res.ok){
+      // quick button highlight
+      document.querySelectorAll('.voteBtn').forEach(b=>b.classList.remove('selected'));
       const btnId = kind==='encore'?'hv_encore':kind==='another'?'hv_another':'hv_maybe';
       const btn=document.getElementById(btnId); btn.classList.add('selected'); setTimeout(()=>btn.classList.remove('selected'),1200);
     }else{
@@ -567,7 +590,7 @@ async function concludeVoting(){
   if(!state.voting.open){ announce(state.voting.lastResult); return; }
   state.voting.open=false; state.voting.endsAt=0;
 
-  // --- Tie-break rules ---
+  // tie-breaks
   const {encore=0,another=0,maybe=0} = state.voting.counts||{};
   const max = Math.max(encore,another,maybe);
   const tied = [];
@@ -578,11 +601,8 @@ async function concludeVoting(){
   if(tied.length===1){
     winner = tied[0];
   }else{
-    // If Encore & Another tie => Encore
     if(tied.includes('encore') && tied.includes('another')) winner='encore';
-    // else if Another ties with Maybe or 3-way => Another
     else if(tied.includes('another')) winner='another';
-    // else fallback
     else winner='maybe';
   }
   state.voting.lastResult=winner;
@@ -625,13 +645,20 @@ function loop(){
     if(state?.voting?.open && t>=state.voting.endsAt){
       await concludeVoting();
     } else {
+      // detect count increases and spawn mini balls
+      const ce=state?.voting?.counts?.encore||0, ca=state?.voting?.counts?.another||0, cm=state?.voting?.counts?.maybe||0;
+      if(ce>lastCounts.encore)  spawnMini('#miniE','encore',  ce-lastCounts.encore);
+      if(ca>lastCounts.another) spawnMini('#miniA','another', ca-lastCounts.another);
+      if(cm>lastCounts.maybe)   spawnMini('#miniM','maybe',   cm-lastCounts.maybe);
+      lastCounts={encore:ce,another:ca,maybe:cm};
+
       render();
       if(state.voting.open) sfx.ensureLoop(); else sfx.stopOpen();
     }
   }, 1000);
 }
 
-/* ---- Audio (unchanged core) ---- */
+/* ---- Audio ---- */
 const sfx = (function(){
   let enabled=false;
   const aOpen   = new Audio('/assets/voting_open.mp3'); aOpen.loop = true; aOpen.preload='auto';
