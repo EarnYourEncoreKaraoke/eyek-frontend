@@ -127,9 +127,8 @@
 
         <div class="divider"></div>
 
-        <!-- Coupon (optional) — replaces old Ad/Promo -->
+        <!-- Coupon (optional) -->
         <div class="sectionTitle white" style="margin-top:0">Coupon (optional)</div>
-
         <div class="row">
           <div>
             <div class="sublabel">Coupon Text</div>
@@ -140,7 +139,6 @@
             <input id="couponLink" type="url" placeholder="https://yourvenue.com/deal" />
           </div>
         </div>
-
         <div class="row" style="margin-top:8px">
           <div>
             <div class="sublabel">Coupon Image (optional)</div>
@@ -151,12 +149,10 @@
             <input id="expiresAt" type="datetime-local" />
           </div>
         </div>
-
         <div class="stack" style="margin-top:10px">
           <button id="submitCoupon" class="btn pri" type="button">Submit Coupon</button>
           <div id="couponSubmitMsg" class="tiny"></div>
         </div>
-        <!-- /Coupon -->
 
         <div class="stack" style="margin-top:10px">
           <button id="saveEvent" class="btn pri">Save</button>
@@ -357,6 +353,7 @@ function spawnMini(containerSel, kind, n=1){
 }
 
 let lastCounts = { encore:0, another:0, maybe:0 };
+let pendingSpawn = { encore:0, another:0, maybe:0 };
 
 async function fetchState(){
   const r=await fetch(GET_URL,{cache:'no-store'});
@@ -369,6 +366,21 @@ async function fetchState(){
   // seed defaults
   state.event   ||= {venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false, coupon:{couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}};
   if(!state.event.coupon) state.event.coupon = {couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''};
+  // Fill from localStorage backup if server has blanks (prevents 'disappearing' inputs)
+  try{
+    const cachedEv = JSON.parse(localStorage.getItem('eyek_last_event') || 'null');
+    if(cachedEv){
+      ['venue','venuePublic','date','kj','hostName','pin'].forEach(k=>{
+        if(!state.event[k]) state.event[k] = cachedEv[k] || state.event[k];
+      });
+      state.event.coupon = state.event.coupon || {};
+      if(cachedEv.coupon){
+        ['couponText','couponLink','couponImageUrl','expiresAt'].forEach(k=>{
+          if(!state.event.coupon[k]) state.event.coupon[k] = cachedEv.coupon[k] || state.event.coupon[k];
+        });
+      }
+    }
+  }catch{}
   state.saved   ||= {venues:[], venuesPublic:[], kjs:[]};
   state.singers ||= []; state.current ||= {id:null,name:'',songArtist:''};
   state.voting  ||= {open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}};
@@ -488,6 +500,7 @@ function bindLive(el, key, transform=(x)=>x, immediate=false){
     }else{
       state.event[key] = val;
     }
+    try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{}
     markEdit(el.id);
     suppressEventRender(900);
     if(immediate){ await postState(); showPinSaved(key); } else { postStateDebounced(); }
@@ -513,6 +526,7 @@ document.getElementById('saveEvent').onclick = async ()=>{
   pushLocalList('venue', venue.value);
   pushLocalList('venuePublic', venuePublic.value);
   pushLocalList('kj', kj.value);
+  try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{}
   await postState(); const m=document.getElementById('eventSavedMsg'); m.textContent='Saved!'; setTimeout(()=>m.textContent='',1400);
 };
 document.getElementById('lockEvent').onclick = async ()=>{
@@ -529,6 +543,7 @@ document.getElementById('resetEvent').onclick = async ()=>{
     voting:{open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}},
     winners:{encore:[], another:[], maybe:[]}
   };
+  try{ localStorage.removeItem('eyek_last_event'); }catch{}
   await postState();
 };
 
@@ -548,6 +563,7 @@ function setCurrent(id){
   state.voting = { open:false, prepUntil:0, endsAt:0, extendCount:0,
                    counts:{encore:0,another:0,maybe:0}, lastResult:null, voters:{} };
   lastCounts = {encore:0,another:0,maybe:0};
+  pendingSpawn = {encore:0,another:0,maybe:0};
   state.current = { id:s.id, name:s.name, songArtist:'' };
   postState();
   logPerformance('set_current');
@@ -570,6 +586,7 @@ document.getElementById('startVote').onclick = async ()=>{
   const t=nowMs();
   state.voting={ open:false, prepUntil: t+5000, endsAt:0, extendCount:0, counts:{encore:0,another:0,maybe:0}, lastResult:null, voters:{} };
   lastCounts = {encore:0,another:0,maybe:0};
+  pendingSpawn = {encore:0,another:0,maybe:0};
   await postState();
   logPerformance('start_round');
 };
@@ -591,7 +608,7 @@ async function hostVote(kind){
   // submit to server
   try{
     const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice:kind, deviceId:deviceId()})});
-    if(res.ok){
+    if(res.ok){ pendingSpawn[kind] = (pendingSpawn[kind]||0) + 1;
       // quick button highlight
       document.querySelectorAll('.voteBtn').forEach(b=>b.classList.remove('selected'));
       const btnId = kind==='encore'?'hv_encore':kind==='another'?'hv_another':'hv_maybe';
@@ -667,11 +684,11 @@ function loop(){
     if(state?.voting?.open && t>=state.voting.endsAt){
       await concludeVoting();
     } else {
-      // detect count increases and spawn mini balls
+      // detect count increases and spawn mini balls (avoid double-spawn from host)
       const ce=state?.voting?.counts?.encore||0, ca=state?.voting?.counts?.another||0, cm=state?.voting?.counts?.maybe||0;
-      if(ce>lastCounts.encore)  spawnMini('#miniE','encore',  ce-lastCounts.encore);
-      if(ca>lastCounts.another) spawnMini('#miniA','another', ca-lastCounts.another);
-      if(cm>lastCounts.maybe)   spawnMini('#miniM','maybe',   cm-lastCounts.maybe);
+      let incE = ce - lastCounts.encore; if(incE>0){ incE = Math.max(0, incE - (pendingSpawn.encore||0)); pendingSpawn.encore = 0; if(incE>0) spawnMini('#miniE','encore', incE); }
+      let incA = ca - lastCounts.another; if(incA>0){ incA = Math.max(0, incA - (pendingSpawn.another||0)); pendingSpawn.another = 0; if(incA>0) spawnMini('#miniA','another', incA); }
+      let incM = cm - lastCounts.maybe; if(incM>0){ incM = Math.max(0, incM - (pendingSpawn.maybe||0)); pendingSpawn.maybe = 0; if(incM>0) spawnMini('#miniM','maybe', incM); }
       lastCounts={encore:ce,another:ca,maybe:cm};
 
       render();
@@ -726,6 +743,7 @@ document.getElementById('play_loser').onclick  = async ()=>{ await sfx.forceEnab
       state.event.coupon.couponText = t;
       state.event.coupon.couponLink  = l;
       state.event.coupon.expiresAt   = e;
+      try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{}
       await postState();
       msg.textContent='Coupon saved.';
       setTimeout(()=>{ msg.textContent=''; }, 2500);
@@ -734,135 +752,6 @@ document.getElementById('play_loser').onclick  = async ()=>{ await sfx.forceEnab
 })();
 
 (async function init(){ await fetchState(); render(); loop(); })();
-</script>
-<script src="/firebase-config.js"></script>
-<script type="module">
-/* ---- Firebase (v9 modular) hookup for Coupon ---- */
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
-import { getFirestore, doc, setDoc, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
-const cfg = (window.firebaseConfig || window.FIREBASE_CONFIG);
-if (!cfg) {
-  console.warn('Missing window.firebaseConfig (from /firebase-config.js). Coupon upload will be skipped.');
-}
-
-const app     = cfg ? initializeApp(cfg) : null;
-const auth    = app ? getAuth(app) : null;
-const storage = app ? getStorage(app) : null;
-const db      = app ? getFirestore(app) : null;
-
-// Anonymous auth (only on the Host page)
-if (auth) {
-  signInAnonymously(auth).catch(e => console.warn('Anon auth failed:', e?.message||e));
-}
-
-const $ = id => document.getElementById(id);
-const btn = $('submitCoupon');
-const msg = $('couponSubmitMsg');
-
-async function uploadImageIfAny(pin) {
-  const f = $('couponImage')?.files?.[0];
-  if (!f || !storage) return null;
-  if (f.size > 5 * 1024 * 1024) { throw new Error('Image too large (max 5MB).'); } // guard
-  const safeName = (Date.now() + '_' + f.name).replace(/[^\w.\-]+/g, '_');
-  const path = `coupons/${pin || 'no-pin'}/${safeName}`;
-  const r = ref(storage, path);
-  await uploadBytes(r, f, { contentType: f.type || 'application/octet-stream' });
-  return await getDownloadURL(r);
-}
-
-function toTimestampOrNull(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? null : Timestamp.fromDate(d);
-}
-
-async function saveToFirestore(pin, data) {
-  if (!db) return; // skip if no firebase
-  // Structure: events/{PIN}/promo/coupon
-  const ref = doc(db, 'events', String(pin || 'no-pin'), 'promo', 'coupon');
-  await setDoc(ref, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
-}
-
-async function mirrorToState(coupon) {
-  try {
-    // Mirror into your existing JSON state for Screen/Vote
-    window.state = window.state || {};
-    state.event = state.event || {};
-    state.event.coupon = Object.assign(
-      { couponText:'', couponLink:'', couponImageUrl:'', expiresAt:'' },
-      state.event.coupon || {},
-      {
-        couponText: coupon.couponText || '',
-        couponLink: coupon.couponLink || '',
-        couponImageUrl: coupon.couponImageUrl || '',
-        // keep ISO string for your PHP/JSON state
-        expiresAt: coupon.expiresAtISO || ''
-      }
-    );
-    if (typeof window.postState === 'function') {
-      await window.postState();
-    }
-  } catch(e) {
-    console.warn('Mirror to state failed (non-fatal):', e);
-  }
-}
-
-btn?.addEventListener('click', async () => {
-  const pin         = $('pin')?.value?.trim() || '';
-  const venue       = $('venue')?.value?.trim() || '';
-  const venuePublic = $('venuePublic')?.value?.trim() || '';
-  const hostName    = $('hostName')?.value?.trim() || '';
-  const kj          = $('kj')?.value?.trim() || '';
-  const eventDate   = $('eventDate')?.value || '';
-
-  const couponText  = $('couponText')?.value?.trim() || '';
-  const couponLink  = $('couponLink')?.value?.trim() || '';
-  const expiresRaw  = $('expiresAt')?.value || '';
-
-  if (!couponText) { msg.textContent = 'Please enter Coupon Text.'; return; }
-  btn.disabled = true; msg.textContent = 'Saving…';
-
-  try {
-    const imageUrl = await uploadImageIfAny(pin);
-    const expiresAt = toTimestampOrNull(expiresRaw);
-
-    const coupon = {
-      couponText,
-      couponLink,
-      couponImageUrl: imageUrl || '',
-
-      // helpful context in Firestore:
-      pin: pin || null,
-      venue,
-      venuePublic,
-      hostName,
-      kj,
-      eventDate: eventDate || null,
-
-      // Firestore-friendly timestamp (nullable):
-      expiresAt: expiresAt || null,
-      // ISO mirror (for your PHP JSON state so other pages can show it immediately):
-      expiresAtISO: expiresRaw || '',
-    };
-
-    await saveToFirestore(pin, coupon);
-    await mirrorToState(coupon);
-
-    msg.textContent = 'Coupon saved to Firebase.';
-  } catch (e) {
-    console.error(e);
-    msg.textContent = (e?.message || 'Save failed.');
-  } finally {
-    btn.disabled = false;
-    setTimeout(() => { if (msg.textContent.includes('saved')) msg.textContent=''; }, 3000);
-  }
-});
 </script>
 </body>
 </html>
