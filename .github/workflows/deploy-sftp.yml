@@ -1,9 +1,9 @@
-name: Deploy to SiteGround via SFTP
+name: Deploy via SFTP
 
 on:
   push:
     branches:
-      - main
+      - main  # or your default branch
 
 jobs:
   deploy:
@@ -13,16 +13,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Optional: Add a build step if needed
-      # - name: Build project
-      #   run: npm install && npm run build
-
-      - name: Deploy via SFTP
-        uses: easingthemes/ssh-deploy@v2.2.11
+      - name: Deploy to SiteGround via SFTP
+        uses: easingthemes/ssh-deploy@v2.1.5
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SFTP_PRIVATE_KEY }}
-          REMOTE_HOST: ${{ secrets.SFTP_HOST }}
-          REMOTE_USER: ${{ secrets.SFTP_USERNAME }}
-          REMOTE_PORT: ${{ secrets.SFTP_PORT }}
-          SOURCE: ./dist
-          TARGET: ${{ secrets.SFTP_PATH }}
+          REMOTE_HOST: your.siteground.server.com
+          REMOTE_USER: your_siteground_username
+          REMOTE_PORT: 22
+          SOURCE: ./
+          TARGET: /vote.earnyourencorekaraoke.com/public_html/
+          ARGS: "-avz --delete"
