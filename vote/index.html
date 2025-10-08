@@ -46,7 +46,7 @@
   }
   #couponBanner img{
     height:44px; width:44px; object-fit:cover; border-radius:8px; border:1px solid var(--line);
-    display:none;
+    display:none; /* default hidden; JS will set to block on load */
   }
   #couponBanner .txt{ font:600 14px/1.35 Montserrat, system-ui; }
   #couponBanner a{ color: var(--accent); text-decoration: none; font-weight:700; display:none }
@@ -213,7 +213,7 @@ if (cfg) {
   // anonymous auth (harmless for read-only; required if you later tighten rules)
   signInAnonymously(auth).catch(()=>{});
 } else {
-  console.warn('firebase-config.js missing or window.firebaseConfig not set; coupon banner will rely only on PHP state (none here).');
+  console.warn('firebase-config.js missing or window.firebaseConfig not set; coupon banner will not use Firebase.');
 }
 
 const banner   = document.getElementById('couponBanner');
@@ -245,19 +245,28 @@ async function resolveImageUrl(data){
   catch { return ''; }
 }
 
+// Ensure we only show the image once it actually loads
+imgEl.addEventListener('load',  ()=>{ imgEl.style.display = 'block'; });
+imgEl.addEventListener('error', ()=>{ imgEl.style.display = 'none'; });
+
 async function renderCoupon(data){
   const exp = data?.expiresAtISO || data?.expiresAt || '';
   if (!data || !data.couponText || isExpired(exp) || dismissed) {
     banner.style.display = 'none';
     return;
   }
+
   textEl.textContent = data.couponText || '';
 
   const url = await resolveImageUrl(data);
-  if (url) { imgEl.src = url; imgEl.style.display = ''; }
-  else { imgEl.style.display = 'none'; }
+  if (url) {
+    imgEl.src = url;              // onload handler will switch display to block
+  } else {
+    imgEl.style.display = 'none';
+    imgEl.removeAttribute('src');
+  }
 
-  if (data.couponLink) { linkEl.href = data.couponLink; linkEl.style.display = ''; }
+  if (data.couponLink) { linkEl.href = data.couponLink; linkEl.style.display = 'inline'; }
   else { linkEl.style.display = 'none'; }
 
   banner.style.display = 'flex';
@@ -269,16 +278,15 @@ closeBtn.addEventListener('click', ()=>{ dismissed = true; banner.style.display=
 (function attachAfterUnlock(){
   const pinInput  = document.getElementById('pin');
   const unlockBtn = document.getElementById('unlockBtn');
-  if(!pinInput || !unlockBtn) return;
+  if(!pinInput || !unlockBtn || !db) return;
 
   unlockBtn.addEventListener('click', ()=>{
     const pin = (pinInput.value || '').trim();
-    if(!pin || !db) return;
+    if(!pin) return;
 
     const refDoc = doc(db, 'events', String(pin), 'promo', 'coupon');
     onSnapshot(refDoc, async (ss)=>{
       const data = ss.exists() ? ss.data() : null;
-      // helpful during testing:
       // console.log('coupon@firestore', data);
       await renderCoupon(data);
     }, ()=>{/* ignore audience read errors */});
