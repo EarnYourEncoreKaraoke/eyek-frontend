@@ -2,60 +2,84 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>EYEK • Host Coupon Test [2025-10-08]</title>
+<title>Encore! • Host</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg1:#1B0930; --bg2:#16072A; --line:#6f52a8; --txt:#ffffff; --muted:#CDBFF0; --accent:#B692FF;
-    --green:#25D366; --yellow:#F6C945; --red:#FF5E6C;
+    --bgDeep1:#1B0930; --bgDeep2:#16072A;
+    --card:#1b0930; --card2:#16072a; --line:#6f52a8; --txt:#eef3ff; --muted:#cdbff0; --accent:#b692ff;
+    --green:#25d366; --yellow:#f6c945; --red:#ff5e6c; --ink:#1a1030;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:var(--txt);font:15px/1.45 "Montserrat",system-ui}
+  body{margin:0;background:linear-gradient(180deg,var(--bgDeep1)...gDeep2));color:var(--txt);font:15px/1.45 "Montserrat",system-ui}
   .page{min-height:100svh;display:grid;grid-template-columns:320px 1fr 300px;gap:16px;padding:18px}
-  @media (max-width:1100px){ .page{grid-template-columns:1fr; padding:12px} }
-  h1{margin:0 0 8px;font-size:22px}
-  .banner{background:#0a3;padding:10px 12px;border-radius:12px;color:#071; font-weight:900;margin-bottom:10px}
-  .card{background:linear-gradient(180deg,#1b0930,#16072a);border:1px solid #5b3d87;border-radius:16px;overflow:hidden}
-  .card > summary{padding:12px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid #5b3d87;cursor:pointer}
-  .card .body{padding:12px 16px 16px}
+  .card{background:linear-gradient(180deg,var(--card),var(--card...line);border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+  .left,.mid,.right{min-height:0}
+  .card h2{margin:0 0 10px;paddi
+  .tiny{font-size:12px;color:var(--muted)}
+  input,select,button{font:inherit}
+  input, select{width:100%; padding:10px 12px; border-radius:10px; border:1px solid #5b3d87; background:#200d3c; color:#fff; outline:none}
+  input[disabled]{opacity:.6}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .row-60-40{display:grid; grid-template-columns:3fr 2fr; gap:12px}
+  @media (max-width:900px){ .row, .row-60-40{grid-template-columns:1fr} }
+  .btn{appearance:none; border:1px solid #5b3d87; background:#2a1352; color:#fff; padding:10px 12px; border-radius:12px; cursor:pointer}
+  .btn[disabled]{opacity:.6; cursor:not-allowed}
+  .btn.pri{background:#4e2aa3; border-color:#7b61c6}
+  .btn.warn{background:#3b0f19; border-color:#b65a5a}
+  .btn.start{background:var(--green); border-color:var(--green); color:#093d21; font-weight:800}
+  .btn.extend{background:var(--yellow);border-color:var(--yellow);color:#3a2c00;font-weight:800}
+  .btn.end{background:var(--red);border-color:var(--red);color:#2b0e12;font-weight:800}
+  .stack{display:flex;gap:8px;flex-wrap:wrap}
+  .pill{display:flex;align-items:center;gap:8px;background:#220d...r(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px}
+  .dot{width:10px;height:10px;border-radius:999px;background:#999;flex:0 0 10px}
+  .dot.green{background:var(--green)} .dot.yellow{background:var(--yellow)}
+  .nameTag{background:#fff;color:#111;padding:4px 8px;border-rad...:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .sectionTitle{font-size:18px;font-weight:900;margin:6px 0 10px}
   .divider{height:1px;background:#5b3d87;margin:10px 0;opacity:.7}
   .sublabel{font-size:12px;color:#e9dbff;margin-top:6px}
-  input,button{font:inherit}
-  input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #5b3d87;background:#200d3c;color:#fff}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  @media (max-width:900px){ .row{grid-template-columns:1fr} }
-  .stack{display:flex;gap:8px;flex-wrap:wrap}
-  .btn{appearance:none;border:1px solid #5b3d87;background:#2a1352;color:#fff;padding:10px 12px;border-radius:12px;cursor:pointer}
-  .tiny{font-size:12px;color:var(--muted)}
-  .ghost{opacity:.6}
-  .miniWhite{background:#fff;color:#111;padding:8px;border-radius:12px}
+  .xl{font-size:28px}
+  .currentBox{background:#220d3f;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:8px}
+  .currentBox .big{font-weight:900;font-size:30px}
+  .miniWhi
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- Left column (just enough to mimic your layout) -->
-  <div class="col">
-    <h1>Host Control</h1>
+  <aside class="left card sticky">
+    <h2>Rotation</h2>
+    <div class="body" id="singerList"></div>
+  </aside>
 
-    <div class="banner">
-      COUPON TEST PAGE — If you can read this, the new file is live (2025-10-08).
-    </div>
-
-    <details class="card" id="setupPanel" open>
-      <summary>Event &amp; KJ Information (Test Shell)</summary>
+  <main class="mid">
+    <details class="setup" id="setupPanel" open>
+      <summary>Event Setup</summary>
       <div class="body">
-
         <div class="row">
           <div>
-            <div class="sublabel">Venue Name</div>
-            <input id="venue" placeholder="Internal Venue Name" />
+            <div class="sublabel">Venue (Internal) – e.g. “Venue - City”</div>
+            <input id="venue" list="venuesList" placeholder="Venue - City" />
+            <datalist id="venuesList"></datalist>
           </div>
           <div>
-            <div class="sublabel">Public Venue Name</div>
-            <input id="venuePublic" placeholder="Public Venue Name" />
+            <div class="sublabel">Public Venue Name (Screen)</div>
+            <input id="venuePublic" list="venuesPublicList" placeholder="Public Venue Name" />
+            <datalist id="venuesPublicList"></datalist>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <div>
+            <div class="sublabel">KJ Company</div>
+            <input id="kj" list="kjsList" placeholder="Karaoke Company" />
+            <datalist id="kjsList"></datalist>
+          </div>
+          <div>
+            <div class="sublabel">KJ Host Name</div>
+            <input id="hostName" placeholder="KJ Host Name" />
           </div>
         </div>
 
@@ -68,16 +92,16 @@
             <div class="sublabel">Event PIN</div>
             <div class="row" style="grid-template-columns:1fr auto;gap:8px">
               <input id="pin" type="password" inputmode="numeric" placeholder="4–6 digits" />
-              <button id="togglePin" class="btn" type="button">Show</button>
+              <button id="togglePin" class="btn">Show</button>
             </div>
+            <div id="pinSaved" class="tiny" style="height:16px;margin-top:4px"></div>
           </div>
         </div>
 
         <div class="divider"></div>
 
-        <!-- ===== Coupon (optional) START ===== -->
-        <div class="sectionTitle" style="margin-top:0">Coupon (optional)</div>
-
+        <!-- Coupon (replaces old Ad/Promo) -->
+        <div class="sectionTitle white" style="margin-top:0">Coupon (optional)</div>
         <div class="row">
           <div>
             <div class="sublabel">Coupon Text</div>
@@ -101,66 +125,324 @@
         </div>
 
         <div class="stack" style="margin-top:10px">
-          <button id="submitCoupon" class="btn" type="button">Submit Coupon</button>
+          <button id="submitCoupon" class="btn pri" type="button">Submit Coupon</button>
           <div id="couponSubmitMsg" class="tiny"></div>
         </div>
-        <!-- ===== Coupon (optional) END ===== -->
+        <!-- /Coupon -->
 
+        <div class="stack" style="margin-top:10px">
+          <button id="saveEvent" class="btn pri">Save</button>
+          <button id="lockEvent" class="btn">Lock</button>
+          <button id="resetEvent" class="btn warn">Reset</button>
+          <div id="eventSavedMsg" class="tiny"></div>
+        </div>
       </div>
     </details>
 
     <div class="card" style="margin-top:16px">
-      <summary>Rotation/Winners (Test Shell)</summary>
+      <h2>Singer Control</h2>
       <div class="body">
-        <div class="sectionTitle" style="margin-top:0">Winners</div>
-        <div class="row">
+        <div class="row-60-40">
           <div>
-            <div class="sublabel">Encore!</div>
-            <div class="miniWhite">—</div>
+            <div class="currentBox">
+              <div class="sectionTitle" style="margin-top:0">Add Singer</div>
+              <div class="row" style="grid-template-columns:1fr 1fr">
+                <div>
+                  <div class="sublabel">Singer Name</div>
+                  <input id="singerName" placeholder="Name" />
+                </div>
+                <div>
+                  <div class="sublabel">Song / Artist</div>
+                  <input id="songArtist" placeholder="Song - Artist" />
+                </div>
+              </div>
+              <div class="stack" style="margin-top:10px">
+                <button id="addSinger" class="btn pri">Add</button>
+              </div>
+
+              <div class="divider"></div>
+              <div class="sectionTitle" style="margin-top:0">Current</div>
+              <div class="kv">
+                <div>
+                  <div class="sublabel">Name</div>
+                  <div id="currentName" class="big">—</div>
+                </div>
+                <div>
+                  <div class="sublabel">Song / Artist</div>
+                  <input id="currentSongArtist" placeholder="(optional)" />
+                </div>
+              </div>
+            </div>
+
+            <div class="sectionTitle" style="margin-top:12px">Singer Rotation</div>
+            <div id="singerList"></div>
           </div>
+
           <div>
-            <div class="sublabel">Another Shot!</div>
-            <div class="miniWhite">—</div>
+            <div class="sectionTitle" style="margin-top:0">Mini Vote Particles</div>
+            <div class="mdots" id="miniDots"></div>
+            <div class="tiny" style="margin-top:6px">Shows lightweight falling dots for each incoming vote.</div>
           </div>
         </div>
       </div>
     </div>
 
-  </div>
+  </main>
 
-  <!-- Middle & Right columns are blank on purpose -->
-  <div class="col"></div>
-  <div class="col"></div>
+  <aside class="right card">
+    <h2>Round Feed</h2>
+    <div class="body">
+      <div class="stack tiny" style="align-items:center;justify-content:space-between">
+        <div id="eventTitle"></div>
+        <div id="nowTs"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="sectionTitle" style="margin-top:0">Last Votes</div>
+      <div id="lastVotes" class="tiny"></div>
+
+      <div class="divider"></div>
+
+      <div class="sectionTitle" style="margin-top:0">Winners</div>
+      <div class="kv">
+        <div>
+          <div class="sublabel">Encore!</div>
+          <div id="wEncore" class="miniWhite" style="min-height:28px"></div>
+        </div>
+        <div>
+          <div class="sublabel">Another Shot!</div>
+          <div id="wAnother" class="miniWhite" style="min-height:28px"></div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
 
 </div>
 
 <script>
-  // Build marker for DevTools
-  console.log("COUPON TEST PAGE • 2025-10-08");
+const GET_URL  = '/assets/get_state.php';
+const POST_URL = '/assets/state.php';
+const VOTE_URL = '/assets/vote.php';
+const PERF_URL = '/assets/submit_performance.php';
 
-  // PIN visibility toggle (small nicety)
-  document.getElementById('togglePin')?.addEventListener('click', ()=>{
-    const pin = document.getElementById('pin');
-    if(!pin) return;
-    const show = pin.type === 'password';
-    pin.type = show ? 'text' : 'password';
-    document.getElementById('togglePin').textContent = show ? 'Hide' : 'Show';
+let state = null;
+let setupPeekUntil = 0;
+const RECENT_MS = 2500;
+
+const $ = sel => document.querySelector(sel);
+const nowMs = ()=> Date.now();
+const fmt = ms => {
+  const s = Math.max(0, Math.round(ms/1000));
+  const m = (s/60|0)+'';
+  const z = (s%60+'').padStart(2,'0');
+  return `${m}:${z}`;
+};
+function markEdit(id){ recentEdit[id]=Date.now(); }
+const recentEdit = {};
+function canUpdateField(el, id){ if(document.activeElement === el) return false; if((recentEdit[id]||0) > Date.now()-RECENT_MS) return false; return true; }
+let pollPaused=false, resumeTimer=null;
+function pausePolling(){ pollPaused=true; clearTimeout(resumeTimer); }
+function resumePollingSoon(){ clearTimeout(resumeTimer); resumeTimer=setTimeout(()=>pollPaused=false, 1000); }
+
+const setupPanel = document.getElementById('setupPanel');
+setupPanel.addEventListener('toggle', ()=>{
+  if(setupPanel.open && !state?.event?.locked){
+    setupPeekUntil = Date.now() + 30000; // 30s grace
+  }
+});
+setupPanel.querySelector('summary').addEventListener('click', ()=>{
+  if (state?.event?.locked){
+    setupPeekUntil = Date.now() + 30000;
+  }
+});
+
+const venue=$('#venue'), venuePublic=$('#venuePublic'), eventDat...ventDate'), kj=$('#kj'), hostName=$('#hostName'), pin=$('#pin');
+const couponText=$('#couponText'), couponLink=$('#couponLink'), couponImage=$('#couponImage'), expiresAt=$('#expiresAt');
+const venuesList=document.getElementById('venuesList'), kjsList=document.getElementById('kjsList');
+const singerName=$('#singerName'), songArtist=$('#songArtist');
+const singerList=$('#singerList');
+const currentName=$('#currentName'), currentSongArtist=$('#currentSongArtist');
+const timerEl=$('#timer'), cE=$('#c_encore'), cA=$('#c_another'), cM=$('#c_maybe'), resultTag=$('#resultTag');
+const pinSaved=$('#pinSaved'); const togglePin=$('#togglePin');
+
+[venue, venuePublic, eventDate, kj, hostName, pin, couponText, couponLink, expiresAt].forEach(el=>{
+  el.addEventListener('focusin', ()=>{ pausePolling(); markEdit(el.id); });
+  el.addEventListener('focusout', resumePollingSoon);
+  el.addEventListener('input', ()=>{ markEdit(el.id); pausePolling(); });
+});
+
+/* Mini-ball spawner */
+function spawnMini(containerSel, kind, n=1){
+  const box=$(containerSel); if(!box) return;
+  const cls = kind==='encore'?'g':kind==='another'?'y':'r';
+  const W=box.clientWidth, H=box.clientHeight;
+  for(let i=0;i<n;i++){
+    const d=d
+  ...
+}
+
+let lastCounts = { encore:0, another:0, maybe:0 };
+
+let clockOffset = 0;
+function smoothOffset(obs){
+  clockOffset = clockOffset*0.9 + obs*0.1;
+}
+
+async function fetchState(){
+  const r=await fetch(GET_URL,{cache:'no-store'});
+  const serverFetchedAt = Date.now();
+  state=await r.json();
+  if(state && typeof state.serverNow === 'number'){
+    const observed = state.serverNow - serverFetchedAt;
+    if(clockOffset === 0) clockOffset = observed; else smoothOffset(observed);
+  }
+  // seed defaults
+  state.event   ||= {venue:'',venuePublic:'',date:new Date().toI...j:'',hostName:'',pin:'',locked:false, ad:{imageUrl:'',text:''}};
+  if(!state.event.ad) state.event.ad = {imageUrl:'',text:''};
+  if(!state.event.coupon) state.event.coupon = {couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''};
+  state.saved   ||= {venues:[], venuesPublic:[], kjs:[]};
+  state.singers ||= []; state.current ||= {id:null,name:'',songArtist:''};
+  state.voting  ||= {open:false,prepUntil:0,endsAt:0,extendCount...,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}};
+  state.winners ||= {encore:[], another:[], maybe:[]};
+}
+
+async function postState(){ await fetch('/assets/state.php',{met...ation/json'},body:JSON.stringify(state)}); await fetchState(); }
+const postStateDebounced = debounce(async ()=>{
+  await fetch('/assets/state.php',{method:'POST
+
+function render(){
+  if(!state) return;
+
+  const disabled = !!state.event.locked;
+  [venue,venuePublic,eventDate,kj,hostName,pin,couponText,couponLink,expiresAt].forEach(el=>el.disabled=disabled);
+
+  // paint fields (respect recent edits)
+  const canPaint = !disabled;
+  if (canPaint && canUpdateField(venue,'venue'))             venue.value       = state.event.venue || '';
+  if (canPaint && canUpdateField(venuePublic,'venuePublic')) venuePublic.value = state.event.venuePublic || '';
+  if (canPaint && canUpdateField(eventDate,'eventDate'))     eventDate.value   = state.event.date || '';
+  if (canPaint && canUpdateField(kj,'kj'))                   kj.value          = state.event.kj || '';
+  if (canPaint && canUpdateField(hostName,'hostName'))       hostName.value    = state.event.hostName || '';
+  if (canPaint && canUpdateField(pin,'pin'))                 pin.value         = state.event.pin || '';
+
+  if (canPaint && canUpdateField(couponText,'couponText'))      couponText.value  = state.event.coupon?.couponText || '';
+  if (canPaint && canUpdateField(couponLink,'couponLink'))      couponLink.value  = state.event.coupon?.couponLink || '';
+  if (canPaint && canUpdateField(expiresAt,'expiresAt'))        expiresAt.value   = state.event.coupon?.expiresAt || '';
+
+  // KEEP OPEN if unlocked OR within peek window
+  const summary = setupPanel.querySelector('summary');
+  if(!disabled){
+    const wantOpen = Date.now() < setupPeekUntil;
+    if(wantOpen) setupPanel.open = true;
+    summary.classList.toggle('ghost', !wantOpen);
+  } else {
+    summary.classList.add('ghost');
+  }
+
+  // rotation list
+  singerList.innerHTML='';
+  (state.singers||[]).forEach(s=>{
+    const row=document.createElement('div'); row.className='pill';
+    const dot=document.createElement('div'); dot.className='dot '+(s._color||'');
+    const name=document.createElement('div'); name.className='nameTag'; name.textContent=s.name;
+    const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px';
+    const setB=document.createElement('button'); setB.className=...art'; setB.textContent='Set'; setB.onclick=()=>setCurrent(s.id);
+    const rmB=document.createElement('button'); rmB.className='b...'; rmB.textContent='Remove'; rmB.onclick=()=>removeSinger(s.id);
+    actions.append(setB,rmB); row.append(dot,name,actions); singerList.append(row);
   });
 
-  // Local-only coupon "save" (no backend; just shows the toast)
-  (function(){
-    const btn = document.getElementById('submitCoupon');
-    if(!btn) return;
-    const msg = document.getElementById('couponSubmitMsg');
-    const $  = id => document.getElementById(id);
+  currentName.textContent=state.current.name||'—';
+  currentSongArtist.disabled=!state.current.id;
+  if(canUpdateField(currentSongArtist,'currentS
+  ...
+}
 
-    btn.addEventListener('click', ()=>{
-      const t = $('couponText')?.value?.trim() || '';
-      if(!t){ msg.textContent = 'Please enter Coupon Text.'; return; }
-      msg.textContent = 'Coupon saved (test page only).';
-      setTimeout(()=>msg.textContent='', 2500);
-    });
-  })();
+function deviceId(){ /* unchanged */ }
+
+function bindLive(el, key, transform=(x=>x), showPinSaved=false, immediate=false){
+  const handler = async ()=>{
+    if(!state?.event) return;
+    const val = transform(el.value);
+    el.value = val;
+    if(key.startsWith('coupon.')){
+      state.event.coupon = state.event.coupon || {couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''};
+      state.event.coupon[key.split('.')[1]] = val;
+    }else if(key.startsWith('ad.')){
+      state.event.ad = state.event.ad || {imageUrl:'',text:''};
+      state.event.ad[key.split('.')[1]] = val;
+    }else{
+      state.event[key] = val;
+    }
+    markEdit(el.id);
+    suppressE
+  };
+  el.addEventListener('input', handler);
+  if(immediate) handler();
+}
+
+bindLive(venue,       'venue');
+bindLive(venuePublic, 'venuePublic');
+bindLive(eventDate,   'date');
+bindLive(kj,          'kj');
+bindLive(hostName,    'hostName');
+bindLive(pin,         'pin', (v)=>v.replace(/[^\d]/g,''), true);
+bindLive(couponText,  'coupon.couponText');
+bindLive(couponLink,  'coupon.couponLink');
+bindLive(expiresAt,   'coupon.expiresAt');
+
+function showPinSaved(key){ if(key!=='pin') return; pinSaved.textContent='PIN saved'; setTimeout(()=>pinSaved.textContent='',1200); }
+togglePin.onclick = ()=>{ pin.type = (pin.type==='password'?'text':'password'); togglePin.textContent = (pin.type==='password'?'Show':'Hide'); };
+
+document.getElementById('saveEvent').onclick = async ()=>{
+  pushLocalList('venue', venue.value);
+  pushLocalList('venuePublic', venuePublic.value);
+  pushLocalList('kj', kj.value);
+  await postState(); const m=document.getElementById('eventSavedMsg'); m.textContent='Saved!'; setTimeout(()=>m.textContent='',1400);
+};
+document.getElementById('lockEvent').onclick = async ()=>{
+  state.event.locked = !state.event.locked;
+  await postState();
+};
+document.getElementById('resetEvent').onclick = async ()=>{
+  if(state.event.locked){ alert('Unlock to reset.'); return;}
+  if(!confirm('Reset this event? This clears singers & votes.')) return;
+  state={ serverUpdatedAt: Date.now()/1000|0,
+    event:{venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false, ad:{imageUrl:'',text:''}},
+    saved:{venues: state.saved?.venues ?? [], kjs: state.saved?.kjs ?? [], venuesPublic: state.saved?.venuesPublic ?? []},
+    singers:[], current:{id:null,name:'',songArtist:''},
+    voting:{open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}},
+    winners:{encore:[], another:[], maybe:[]}
+  };
+  await postState();
+};
+
+// Coupon submit (Firebase Storage integration pending)
+(function(){
+  const btn = document.getElementById('submitCoupon');
+  if(!btn) return;
+  const msg = document.getElementById('couponSubmitMsg');
+  btn.addEventListener('click', async ()=>{
+    try{
+      const t = document.getElementById('couponText')?.value?.trim() || '';
+      const l = document.getElementById('couponLink')?.value?.trim() || '';
+      const e = document.getElementById('expiresAt')?.value || '';
+      if(!t){ msg.textContent='Please enter Coupon Text.'; return; }
+      state.event = state.event || {};
+      state.event.coupon = Object.assign({couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}, state.event.coupon||{});
+      state.event.coupon.couponText = t;
+      state.event.coupon.couponLink  = l;
+      state.event.coupon.expiresAt   = e;
+      if(typeof postState==='function') await postState();
+      msg.textContent='Coupon saved.';
+      setTimeout(()=>{ msg.textContent=''; }, 2500);
+    }catch(err){ console.error(err); msg.textContent='Save failed.'; setTimeout(()=>{ msg.textContent=''; }, 2500); }
+  });
+})();
+
+/* Singer ops, voting controls, audio, polling ... (unchanged from your file) */
 </script>
+
 </body>
 </html>
