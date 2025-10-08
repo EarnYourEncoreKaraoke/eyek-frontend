@@ -3,7 +3,7 @@ name: Deploy via SFTP
 on:
   push:
     branches:
-      - main  # or your default branch
+      - main  # Change this if your default branch is different
 
 jobs:
   deploy:
@@ -21,5 +21,5 @@ jobs:
           REMOTE_USER: u2212-6q1dxbl4nmbd
           REMOTE_PORT: 18765
           SOURCE: ./
-          TARGET: /vote.earnyourencorekaraoke.com/public_html/
+          TARGET: /home/customer/www/vote.earnyourencorekaraoke.com/public_html/
           ARGS: "-avz --delete"
