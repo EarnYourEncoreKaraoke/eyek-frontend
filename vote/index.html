@@ -1,4 +1,4 @@
-<!-- EYEK /vote v2025-10-08T22:30:00Z build 3 -->
+<!-- EYEK /vote v2025-10-08T23:59:00Z build 7 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -31,10 +31,12 @@
   .msg{min-height:18px}
   .voteRow{display:grid;grid-template-columns:1fr;gap:10px}
   .who{border:1px dashed rgba(255,255,255,.25);padding:10px;border-radius:10px;background:#210D3F}
+
   /* Overlay */
   #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;z-index:9998}
   #ovCard{padding:20px 18px;border-radius:16px;text-align:center;border:2px solid var(--line);background:linear-gradient(180deg,#1B0930,#16072A);min-width:270px}
   #ovTitle{font-size:26px;font-weight:800}
+
   /* Coupon banner (bottom) */
   #couponBanner{
     position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 9999;
@@ -48,12 +50,15 @@
   #couponBanner .txt{ font:600 14px/1.35 Montserrat, system-ui; }
   #couponBanner a{ color: var(--accent); text-decoration: none; font-weight:700; display:none }
   #couponClose{ margin-left:auto; background:#2A1352; border:1px solid var(--line); color:#fff; padding:6px 10px; border-radius:10px; cursor:pointer; }
-  @media (max-width:600px){ #couponBanner{ left:8px; right:8px; bottom:8px; } }
+
+  /* tiny visible version badge */
+  .verBadge{position:fixed;bottom:6px;left:8px;font-size:11px;color:#cdbff0;opacity:.7;z-index:99999;pointer-events:none;user-select:none}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="verBadge">EYEK /vote v2025-10-08 • build 7</div>
 
+<div class="wrap">
   <header>
     <h1 id="venueTitle">Encore! Vote</h1>
     <div class="sub" id="nowSinging">&nbsp;</div>
@@ -94,10 +99,9 @@
       <div id="ovSub" class="sub" style="margin-top:6px">—</div>
     </div>
   </div>
-
 </div>
 
-<!-- Coupon banner (bottom of vote page) -->
+<!-- Coupon banner -->
 <div id="couponBanner" role="region" aria-label="Venue Coupon">
   <img id="couponImg" alt="Coupon image" />
   <div class="txt" id="couponTextOut">—</div>
@@ -106,6 +110,9 @@
 </div>
 
 <script>
+/* ===== Version (also at bottom) ===== */
+const VER_TXT = "EYEK /vote v2025-10-08 • build 7";
+
 /* ===== Core vote page (PHP backend) ===== */
 const GET_URL = '/assets/get_state.php';
 const VOTE_URL = '/assets/vote.php';
@@ -156,18 +163,27 @@ unlockBtn.addEventListener('click', async ()=>{
 async function sendVote(kind){
   if(!unlocked){ voteMsg.textContent='Unlock with event PIN first.'; return; }
   if(!currentSingerId){ voteMsg.textContent='No singer set yet.'; return; }
-  const body = { pin:eventPin, singer: currentSingerId, vote:kind, device: deviceId() };
+
+  // send many keys to satisfy different server handlers
+  const body = {
+    pin: eventPin, eventPin,
+    singer: currentSingerId, singerId: currentSingerId,
+    vote: kind, choice: kind,
+    device: deviceId(), deviceId: deviceId()
+  };
+
   try{
     const r = await fetch(VOTE_URL,{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if(!r.ok){
-      const e=await r.json().catch(()=>({error:'vote_failed'}));
-      if((e.error||'').includes('already')){ showOverlay('another','Already Voted','One vote per device per singer'); }
+      let e=null; try{ e=await r.json(); }catch{}
+      if(e && (e.error||'').includes('already')){ showOverlay('another','Already Voted','One vote per device per singer'); }
       else { showOverlay('maybe','Error','Please try again'); }
       return;
     }
     showOverlay(kind, kind==='encore'?'Encore! Congratulations!':(kind==='another'?'Another Shot!':'Maybe Next Time!'), 'Vote received');
+    voteMsg.textContent='';
   }catch(e){
-    showOverlay('maybe','Error','Please try again');
+    showOverlay('maybe','Network Error','Please try again');
   }
   await fetchState();
 }
@@ -193,7 +209,7 @@ function showOverlay(kind, title, sub){
 <!-- Firebase config (must exist at site root) -->
 <script src="/firebase-config.js"></script>
 
-<!-- Audience coupon: read from Firestore after PIN unlock; resolve Storage path to URL when needed -->
+<!-- Audience coupon: read Firestore after PIN unlock; resolve Storage path to URL when needed -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js';
@@ -209,8 +225,6 @@ if (cfg) {
   db   = getFirestore(app);
   st   = getStorage(app);
   signInAnonymously(auth).catch(()=>{});
-} else {
-  console.warn('firebase-config.js missing or window.firebaseConfig not set.');
 }
 
 const banner   = document.getElementById('couponBanner');
@@ -218,12 +232,11 @@ const imgEl    = document.getElementById('couponImg');
 const textEl   = document.getElementById('couponTextOut');
 const linkEl   = document.getElementById('couponLinkOut');
 const closeBtn = document.getElementById('couponClose');
-
 let dismissed = false;
 
 function isExpired(iso){ if(!iso) return false; const t=Date.parse(iso); return isNaN(t)?false:(Date.now()>t); }
 
-// Accept multiple possible fields; if only a Storage PATH exists, resolve to URL
+// Resolve URL from either direct URL field or a Storage path
 async function resolveImageUrl(data){
   const direct =
     data?.couponImageUrl ||
@@ -238,47 +251,38 @@ async function resolveImageUrl(data){
   catch { return ''; }
 }
 
-// Ensure we only show the image once it actually loads
-imgEl.addEventListener('load',  ()=>{ imgEl.style.display = 'block'; });
-imgEl.addEventListener('error', ()=>{ imgEl.style.display = 'none'; });
+imgEl.addEventListener('load',  ()=>{ imgEl.style.display='block'; });
+imgEl.addEventListener('error', ()=>{ imgEl.style.display='none'; });
 
 async function renderCoupon(data){
   const exp = data?.expiresAtISO || data?.expiresAt || '';
   if (!data || !data.couponText || isExpired(exp) || dismissed) {
-    banner.style.display = 'none';
-    return;
+    banner.style.display='none'; return;
   }
   textEl.textContent = data.couponText || '';
-
   const url = await resolveImageUrl(data);
-  if (url) { imgEl.src = url; } else { imgEl.style.display = 'none'; imgEl.removeAttribute('src'); }
-
-  if (data.couponLink) { linkEl.href = data.couponLink; linkEl.style.display = 'inline'; }
-  else { linkEl.style.display = 'none'; }
-
-  banner.style.display = 'flex';
+  if (url) { imgEl.src = url; } else { imgEl.style.display='none'; imgEl.removeAttribute('src'); }
+  if (data.couponLink) { linkEl.href=data.couponLink; linkEl.style.display='inline'; }
+  else { linkEl.style.display='none'; }
+  banner.style.display='flex';
 }
 
 closeBtn.addEventListener('click', ()=>{ dismissed = true; banner.style.display='none'; });
 
-// Hook after the existing PIN unlock button
+// Start listening when user unlocks with PIN
 (function attachAfterUnlock(){
-  const pinInput  = document.getElementById('pin');
   const unlockBtn = document.getElementById('unlockBtn');
-  if(!pinInput || !unlockBtn || !db) return;
-
+  const pinInput  = document.getElementById('pin');
+  if(!db || !unlockBtn || !pinInput) return;
   unlockBtn.addEventListener('click', ()=>{
-    const pin = (pinInput.value || '').trim();
+    const pin = (pinInput.value||'').trim();
     if(!pin) return;
-
-    const refDoc = doc(db, 'events', String(pin), 'promo', 'coupon');
-    onSnapshot(refDoc, async (ss)=>{
-      const data = ss.exists() ? ss.data() : null;
-      await renderCoupon(data);
-    }, ()=>{/* ignore audience read errors */});
+    const refDoc = doc(db,'events',String(pin),'promo','coupon');
+    onSnapshot(refDoc, async (ss)=>{ await renderCoupon(ss.exists()?ss.data():null); }, ()=>{});
   });
 })();
 </script>
 
+<!-- EYEK /vote v2025-10-08T23:59:00Z build 7 -->
 </body>
 </html>
