@@ -1,4 +1,4 @@
-<!-- EYEK /vote v2025-10-08T23:59:00Z build 7 -->
+<!-- EYEK /vote v2025-10-08T23:59:00Z build 9 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -56,7 +56,7 @@
 </style>
 </head>
 <body>
-<div class="verBadge">EYEK /vote v2025-10-08 • build 7</div>
+<div class="verBadge">EYEK /vote v2025-10-08 • build 9</div>
 
 <div class="wrap">
   <header>
@@ -110,13 +110,14 @@
 </div>
 
 <script>
-/* ===== Version (also at bottom) ===== */
-const VER_TXT = "EYEK /vote v2025-10-08 • build 7";
+/* ===== Version ===== */
+const VER_TXT = "EYEK /vote v2025-10-08 • build 9";
 
-/* ===== Core vote page (PHP backend) ===== */
+/* ===== Endpoints ===== */
 const GET_URL = '/assets/get_state.php';
 const VOTE_URL = '/assets/vote.php';
 
+/* ===== Helpers ===== */
 const $ = s => document.querySelector(s);
 const pinEl = $('#pin'), unlockBtn = $('#unlockBtn'), unlockMsg = $('#unlockMsg');
 const unlockSection = $('#unlock'), voteUI = $('#voteUI');
@@ -135,16 +136,34 @@ function deviceId(){
   }catch(e){ return 'na_'+Math.random().toString(36).slice(2,7); }
 }
 
+/* Remember PIN for 48h (localStorage + cookie) */
+function rememberPin(pin){
+  try{ localStorage.setItem('eyek_last_pin', JSON.stringify({pin, ts:Date.now()})); }catch{}
+  try{ document.cookie = 'eyek_last_pin='+encodeURIComponent(pin)+'; Max-Age='+(48*3600)+'; Path=/; SameSite=Lax'; }catch{}
+}
+function getRememberedPin(){
+  let pin=''; try{
+    const raw=localStorage.getItem('eyek_last_pin'); if(raw){ const {pin:p,ts}=JSON.parse(raw); if(p && Date.now()-ts < 48*3600*1000) pin=p; }
+  }catch{}
+  if(!pin){ try{ const m=document.cookie.match(/(?:^|;)\s*eyek_last_pin=([^;]+)/); if(m) pin=decodeURIComponent(m[1]||''); }catch{} }
+  return pin;
+}
+
+/* Fetch & render state */
 async function fetchState(){
   const r = await fetch(GET_URL, { cache:'no-store' });
   state = await r.json().catch(()=>null);
-  const s = state || {};
-  const e = s.event || {};
-  const c = s.current || {};
+  const s = state || {}; const e = s.event || {}; const c = s.current || {};
   venueTitle.textContent = e.venuePublic || e.venue || 'Encore! Vote';
   nowSinging.textContent = c.name ? ('Now singing: '+c.name) : '';
   currentSingerId = c.id || null;
   singerEl.textContent = c.name || '—';
+
+  // auto-unlock if remembered PIN matches current event
+  const saved = getRememberedPin();
+  if(saved && e.pin && saved === e.pin && !unlocked){
+    eventPin = saved; setUnlocked(true); unlockMsg.textContent='';
+  }
 }
 
 function setUnlocked(on){
@@ -156,22 +175,17 @@ function setUnlocked(on){
 unlockBtn.addEventListener('click', async ()=>{
   eventPin = (pinEl.value||'').trim();
   if(!eventPin){ unlockMsg.textContent='Enter the event PIN.'; return; }
-  setUnlocked(true); unlockMsg.textContent='';
-  await fetchState();
+  await fetchState(); // ensure we have current event pin to compare
+  if(eventPin !== (state?.event?.pin||'')){ unlockMsg.textContent='Wrong PIN.'; return; }
+  rememberPin(eventPin);
+  setUnlocked(true); unlockMsg.textContent='Unlocked.';
 });
 
 async function sendVote(kind){
   if(!unlocked){ voteMsg.textContent='Unlock with event PIN first.'; return; }
   if(!currentSingerId){ voteMsg.textContent='No singer set yet.'; return; }
 
-  // send many keys to satisfy different server handlers
-  const body = {
-    pin: eventPin, eventPin,
-    singer: currentSingerId, singerId: currentSingerId,
-    vote: kind, choice: kind,
-    device: deviceId(), deviceId: deviceId()
-  };
-
+  const body = { choice: kind, deviceId: deviceId() }; // matches your PHP
   try{
     const r = await fetch(VOTE_URL,{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if(!r.ok){
@@ -194,6 +208,7 @@ vM.addEventListener('click', ()=>sendVote('maybe'));
 setInterval(fetchState, 8000);
 fetchState();
 
+/* Overlay helpers */
 function showOverlay(kind, title, sub){
   const ov = document.getElementById('overlay');
   const card = document.getElementById('ovCard');
@@ -209,7 +224,7 @@ function showOverlay(kind, title, sub){
 <!-- Firebase config (must exist at site root) -->
 <script src="/firebase-config.js"></script>
 
-<!-- Audience coupon: read Firestore after PIN unlock; resolve Storage path to URL when needed -->
+<!-- Audience coupon: Firestore + Storage -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js';
@@ -236,7 +251,7 @@ let dismissed = false;
 
 function isExpired(iso){ if(!iso) return false; const t=Date.parse(iso); return isNaN(t)?false:(Date.now()>t); }
 
-// Resolve URL from either direct URL field or a Storage path
+// Resolve URL from direct URL or a Storage path
 async function resolveImageUrl(data){
   const direct =
     data?.couponImageUrl ||
@@ -254,35 +269,38 @@ async function resolveImageUrl(data){
 imgEl.addEventListener('load',  ()=>{ imgEl.style.display='block'; });
 imgEl.addEventListener('error', ()=>{ imgEl.style.display='none'; });
 
-async function renderCoupon(data){
-  const exp = data?.expiresAtISO || data?.expiresAt || '';
-  if (!data || !data.couponText || isExpired(exp) || dismissed) {
-    banner.style.display='none'; return;
-  }
-  textEl.textContent = data.couponText || '';
-  const url = await resolveImageUrl(data);
-  if (url) { imgEl.src = url; } else { imgEl.style.display='none'; imgEl.removeAttribute('src'); }
-  if (data.couponLink) { linkEl.href=data.couponLink; linkEl.style.display='inline'; }
-  else { linkEl.style.display='none'; }
-  banner.style.display='flex';
+// When PIN is set (either typed or auto-remembered), start Firestore listener
+function startCouponListener(pin){
+  if(!db || !pin) return;
+  const refDoc = doc(db,'events',String(pin),'promo','coupon');
+  onSnapshot(refDoc, async (ss)=>{
+    const data = ss.exists()? ss.data() : null;
+    if(!data || !data.couponText || dismissed || isExpired(data.expiresAt||data.expiresAtISO)){ banner.style.display='none'; return; }
+    textEl.textContent = data.couponText || '';
+    const url = await resolveImageUrl(data);
+    if (url) { imgEl.src = url; } else { imgEl.style.display='none'; imgEl.removeAttribute('src'); }
+    if (data.couponLink) { linkEl.href=data.couponLink; linkEl.style.display='inline'; } else { linkEl.style.display='none'; }
+    banner.style.display='flex';
+  }, ()=>{ /* ignore errors for now */ });
 }
 
 closeBtn.addEventListener('click', ()=>{ dismissed = true; banner.style.display='none'; });
 
-// Start listening when user unlocks with PIN
-(function attachAfterUnlock(){
-  const unlockBtn = document.getElementById('unlockBtn');
-  const pinInput  = document.getElementById('pin');
-  if(!db || !unlockBtn || !pinInput) return;
-  unlockBtn.addEventListener('click', ()=>{
-    const pin = (pinInput.value||'').trim();
-    if(!pin) return;
-    const refDoc = doc(db,'events',String(pin),'promo','coupon');
-    onSnapshot(refDoc, async (ss)=>{ await renderCoupon(ss.exists()?ss.data():null); }, ()=>{});
-  });
+// Hook up to unlock button to start listening
+document.getElementById('unlockBtn').addEventListener('click', ()=>{
+  const pin = (document.getElementById('pin')?.value||'').trim();
+  if(pin) startCouponListener(pin);
+});
+
+// Also start listener if we auto-remembered the PIN
+(function autoStart(){
+  try{
+    const raw = localStorage.getItem('eyek_last_pin');
+    if(raw){ const {pin,ts}=JSON.parse(raw); if(pin && Date.now()-ts < 48*3600*1000){ startCouponListener(pin); } }
+  }catch{}
 })();
 </script>
 
-<!-- EYEK /vote v2025-10-08T23:59:00Z build 7 -->
+<!-- EYEK /vote v2025-10-08T23:59:00Z build 9 -->
 </body>
 </html>
