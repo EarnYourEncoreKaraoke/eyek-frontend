@@ -1,3 +1,4 @@
+<!-- EYEK /host v2025-10-08T22:30:00Z build 3 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -76,11 +77,13 @@
 <body>
 <div class="page">
 
+  <!-- LEFT: rotation -->
   <aside class="left card sticky">
     <h2>Rotation</h2>
     <div class="body" id="singerList"></div>
   </aside>
 
+  <!-- MID -->
   <main class="mid">
     <details class="setup" id="setupPanel" open>
       <summary>Event Setup</summary>
@@ -252,6 +255,7 @@
     </div>
   </main>
 
+  <!-- RIGHT -->
   <aside class="right card sticky">
     <h2>Quick Links</h2>
     <div class="body">
@@ -436,16 +440,22 @@ document.getElementById('extendVote').onclick = async ()=>{ if(!state.voting.ope
 document.getElementById('endVote').onclick = async ()=>{ await concludeVoting(); };
 
 function deviceId(){ let id=localStorage.getItem('eyek_device_id'); if(!id){ id=(crypto?.randomUUID?.()||('d_'+Math.random().toString(36).slice(2,11))); localStorage.setItem('eyek_device_id', id);} return id; }
-async function hostVote(kind){ if(!(state?.voting?.open)) return; const map = {encore:'#miniE', another:'#miniA', maybe:'#miniM'};
+async function hostVote(kind){
+  if(!(state?.voting?.open)) return;
+  const map = {encore:'#miniE', another:'#miniA', maybe:'#miniM'};
   // Optimistic suppression: assume one server increment will arrive next tick
   pendingSpawn[kind] = (pendingSpawn[kind]||0) + 1;
   // Local visual feedback immediately
   spawnMini(map[kind], kind, 1);
-  // Send to server
+  // Send to server (match your PHP: pin + singer + vote + device)
   try{
-    const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ choice:kind, deviceId:deviceId() })});
-    if(!res.ok){ const e=await res.json().catch(()=>({error:'vote_failed'})); if(e.error==='already_voted'){ alert('Only one vote per device per singer.'); }
-      // Revert suppression if the vote failed
+    const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      pin: state.event?.pin || '', singer: state.current?.id || '', vote: kind, device: deviceId()
+    })});
+    if(!res.ok){
+      const e=await res.json().catch(()=>({error:'vote_failed'}));
+      if(e.error==='already_voted'){ alert('Only one vote per device per singer.'); }
+      // Revert suppression if failed
       pendingSpawn[kind] = Math.max(0, (pendingSpawn[kind]||1) - 1);
     } else {
       // Button highlight
@@ -461,21 +471,69 @@ document.getElementById('hv_encore').onclick = ()=>hostVote('encore');
 document.getElementById('hv_another').onclick = ()=>hostVote('another');
 document.getElementById('hv_maybe').onclick  = ()=>hostVote('maybe');
 
-async function concludeVoting(){ if(!state.voting.open){ announce(state.voting.lastResult); return; } state.voting.open=false; state.voting.endsAt=0; const {encore=0,another=0,maybe=0} = state.voting.counts||{}; const max = Math.max(encore,another,maybe); const tied = []; if(encore===max) tied.push('encore'); if(another===max) tied.push('another'); if(maybe===max) tied.push('maybe'); let winner; if(tied.length===1){ winner = tied[0]; }else{ if(tied.includes('encore') && tied.includes('another')) winner='encore'; else if(tied.includes('another')) winner='another'; else winner='maybe'; } state.voting.lastResult=winner; const cur=state.singers.find(s=>s.id===state.current.id); const nowISO = new Date().toISOString(); if(cur){ if(winner==='maybe'){ state.singers=state.singers.filter(s=>s.id!==cur.id); state.winners.maybe.unshift({when:nowISO, name:cur.name, song:state.current.songArtist||''}); state.winners.maybe = state.winners.maybe.slice(0,200); } else { cur._color=(winner==='encore'?'green':'yellow'); state.winners[winner].unshift({when:nowISO, name:state.current.name, song:state.current.songArtist||''}); state.winners[winner]=state.winners[winner].slice(0,200); } } state.current = { id:null, name:'', songArtist:'' }; await postState(); announce(winner); sfx.stopOpen(); if (winner === 'encore') setTimeout(()=>sfx.playEncore(),120); else if (winner === 'maybe') setTimeout(()=>sfx.playLoser(),120); }
+async function concludeVoting(){
+  if(!state.voting.open){ announce(state.voting.lastResult); return; }
+  state.voting.open=false; state.voting.endsAt=0;
+  const {encore=0,another=0,maybe=0} = state.voting.counts||{};
+  const max = Math.max(encore,another,maybe);
+  const tied = []; if(encore===max) tied.push('encore'); if(another===max) tied.push('another'); if(maybe===max) tied.push('maybe');
+  let winner;
+  if(tied.length===1){ winner = tied[0]; }else{
+    if(tied.includes('encore') && tied.includes('another')) winner='encore';
+    else if(tied.includes('another')) winner='another';
+    else winner='maybe';
+  }
+  state.voting.lastResult=winner;
+  const cur=state.singers.find(s=>s.id===state.current.id);
+  const nowISO = new Date().toISOString();
+  if(cur){
+    if(winner==='maybe'){
+      state.singers=state.singers.filter(s=>s.id!==cur.id);
+      state.winners.maybe.unshift({when:nowISO, name:cur.name, song:state.current.songArtist||''});
+      state.winners.maybe = state.winners.maybe.slice(0,200);
+    } else {
+      cur._color=(winner==='encore'?'green':'yellow');
+      state.winners[winner].unshift({when:nowISO, name:state.current.name, song:state.current.songArtist||''});
+      state.winners[winner]=state.winners[winner].slice(0,200);
+    }
+  }
+  state.current = { id:null, name:'', songArtist:'' };
+  await postState(); announce(winner);
+  sfx.stopOpen();
+  if (winner === 'encore') setTimeout(()=>sfx.playEncore(),120);
+  else if (winner === 'maybe') setTimeout(()=>sfx.playLoser(),120);
+}
 
-function loop(){ if(poll) clearInterval(poll); poll=setInterval(async ()=>{ if(pollPaused) return; await fetchState(); const t=nowMs(); if(!state.voting.open && (state.voting.prepUntil||0) > 0 && t >= state.voting.prepUntil){ state.voting.open = true; state.voting.prepUntil = 0; state.voting.endsAt = t + 30000; await postState(); sfx.startLoop(); }
-  if(state?.voting?.open && t>=state.voting.endsAt){ await concludeVoting(); } else {
-    // detect count increases and spawn mini balls (subtract optimistic host spawns)
-    const ce=state?.voting?.counts?.encore||0, ca=state?.voting?.counts?.another||0, cm=state?.voting?.counts?.maybe||0;
-    let incE = ce - lastCounts.encore; if(incE>0){ const sup=pendingSpawn.encore||0; incE = Math.max(0, incE - sup); pendingSpawn.encore = Math.max(0, sup - (ce - lastCounts.encore)); if(incE>0) spawnMini('#miniE','encore', incE); }
-    let incA = ca - lastCounts.another; if(incA>0){ const sup=pendingSpawn.another||0; incA = Math.max(0, incA - sup); pendingSpawn.another = Math.max(0, sup - (ca - lastCounts.another)); if(incA>0) spawnMini('#miniA','another', incA); }
-    let incM = cm - lastCounts.maybe; if(incM>0){ const sup=pendingSpawn.maybe||0; incM = Math.max(0, incM - sup); pendingSpawn.maybe = Math.max(0, sup - (cm - lastCounts.maybe)); if(incM>0) spawnMini('#miniM','maybe', incM); }
-    lastCounts={encore:ce,another:ca,maybe:cm}; render(); if(state.voting.open) sfx.ensureLoop(); else sfx.stopOpen(); }
-}, 750); } // poll faster for snappier visuals
+function loop(){
+  if(poll) clearInterval(poll);
+  poll=setInterval(async ()=>{
+    if(pollPaused) return;
+    await fetchState();
+    const t=nowMs();
+    if(!state.voting.open && (state.voting.prepUntil||0) > 0 && t >= state.voting.prepUntil){
+      state.voting.open = true;
+      state.voting.prepUntil = 0;
+      state.voting.endsAt = t + 30000;
+      await postState();
+      sfx.startLoop();
+    }
+    if(state?.voting?.open && t>=state.voting.endsAt){
+      await concludeVoting();
+    } else {
+      // detect count increases and spawn mini balls (subtract optimistic host spawns)
+      const ce=state?.voting?.counts?.encore||0, ca=state?.voting?.counts?.another||0, cm=state?.voting?.counts?.maybe||0;
+      let incE = ce - lastCounts.encore; if(incE>0){ const sup=pendingSpawn.encore||0; incE = Math.max(0, incE - sup); pendingSpawn.encore = Math.max(0, sup - (ce - lastCounts.encore)); if(incE>0) spawnMini('#miniE','encore', incE); }
+      let incA = ca - lastCounts.another; if(incA>0){ const sup=pendingSpawn.another||0; incA = Math.max(0, incA - sup); pendingSpawn.another = Math.max(0, sup - (ca - lastCounts.another)); if(incA>0) spawnMini('#miniA','another', incA); }
+      let incM = cm - lastCounts.maybe; if(incM>0){ const sup=pendingSpawn.maybe||0; incM = Math.max(0, incM - sup); pendingSpawn.maybe = Math.max(0, sup - (cm - lastCounts.maybe)); if(incM>0) spawnMini('#miniM','maybe', incM); }
+      lastCounts={encore:ce,another:ca,maybe:cm};
+      render();
+      if(state.voting.open) sfx.ensureLoop(); else sfx.stopOpen();
+    }
+  }, 750);
+}
 
 /* ---- Audio ---- */
-const sfx = (function(){ let enabled=false; const aOpen=new Audio('/assets/voting_open.mp3'); aOpen.loop = true; aOpen.preload='auto'; const aEncore=new Audio('/assets/encore.mp3'); aEncore.preload='auto'; const aLoser=new Audio('/assets/loser.wav'); aLoser.preload='auto'; let triedWavFallback=false; const btn=document.getElementById('enableSound'); const statusEl=document.getElementById('soundStatus'); const loopEl=document.getElementById('loopStatus'); function setStatus(){ statusEl.innerHTML = 'Sound: <b>'+(enabled?'on':'off')+'</b>'; } function setLoop(v){ loopEl.innerHTML = 'Loop: <b>'+(v?'playing':'stopped')+'</b>'; } let ctx=null; function waPing(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(), g=ctx.createGain(); g.gain.value=0.0001; o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.02); return true; }catch{ return false; } } async function warm(el){ try{ el.muted=true; await el.play(); el.pause(); el.currentTime=0; el.muted=false; return true; }catch{ return false; } } async function enable(){ const ok = waPing() | await warm(aEncore) | await warm(aLoser) | await warm(aOpen); enabled = !!ok; setStatus(); if(enabled){ btn.classList.remove('callout','start'); btn.classList.add('end'); btn.textContent='Disable sound'; } return enabled; } function disable(){ enabled=false; setStatus(); stopOpen(); btn.classList.remove('end'); btn.classList.add('start','callout'); btn.textContent='Enable sound'; } btn.addEventListener('click', async ()=>{ if(!enabled) await enable(); else disable(); }); async function forceEnable(){ if(!enabled) await enable(); } function safePlay(a){ if(!enabled) return; a.play().then(()=>setLoop(!a.paused)).catch(()=>setLoop(false)); } function stopOpen(){ try{ aOpen.pause(); aOpen.currentTime=0; setLoop(false);}catch{} } setInterval(async ()=>{ if(!enabled) return; if(state?.voting?.open){ if(aOpen.paused){ try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true); }catch{ if(!triedWavFallback){ triedWavFallback=true; aOpen.src='/assets/voting_open.wav'; try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true);}catch{ setLoop(false); } } else setLoop(false); } } else setLoop(true); }}, 1500); document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') ensureLoop(); }); async function ensureLoop(){ if(!enabled || !state?.voting?.open) return setLoop(false); if(aOpen.paused){ try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true); }catch{ if(!triedWavFallback){ triedWavFallback=true; aOpen.src='/assets/voting_open.wav'; try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true);}catch{ setLoop(false); } } else setLoop(false); } } else setLoop(true); } return { startLoop(){ if(!enabled) return; aOpen.load(); aOpen.currentTime=0; aOpen.play().then(()=>setLoop(true)).catch(()=>setLoop(false)); }, stopOpen, ensureLoop, playEncore(){ safePlay(aEncore); }, playLoser(){ safePlay(aLoser); }, forceEnable };
-})();
+const sfx = (function(){ let enabled=false; const aOpen=new Audio('/assets/voting_open.mp3'); aOpen.loop = true; aOpen.preload='auto'; const aEncore=new Audio('/assets/encore.mp3'); aEncore.preload='auto'; const aLoser=new Audio('/assets/loser.wav'); aLoser.preload='auto'; let triedWavFallback=false; const btn=document.getElementById('enableSound'); const statusEl=document.getElementById('soundStatus'); const loopEl=document.getElementById('loopStatus'); function setStatus(){ statusEl.innerHTML = 'Sound: <b>'+(enabled?'on':'off')+'</b>'; } function setLoop(v){ loopEl.innerHTML = 'Loop: <b>'+(v?'playing':'stopped')+'</b>'; } let ctx=null; function waPing(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(), g=ctx.createGain(); g.gain.value=0.0001; o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.02); return true; }catch{ return false; } } async function warm(el){ try{ el.muted=true; await el.play(); el.pause(); el.currentTime=0; el.muted=false; return true; }catch{ return false; } } async function enable(){ const ok = waPing() | await warm(aEncore) | await warm(aLoser) | await warm(aOpen); enabled = !!ok; setStatus(); if(enabled){ btn.classList.remove('callout','start'); btn.classList.add('end'); btn.textContent='Disable sound'; } return enabled; } function disable(){ enabled=false; setStatus(); stopOpen(); btn.classList.remove('end'); btn.classList.add('start','callout'); btn.textContent='Enable sound'; } btn.addEventListener('click', async ()=>{ if(!enabled) await enable(); else disable(); }); async function forceEnable(){ if(!enabled) await enable(); } function safePlay(a){ if(!enabled) return; a.play().then(()=>setLoop(!a.paused)).catch(()=>setLoop(false)); } function stopOpen(){ try{ aOpen.pause(); aOpen.currentTime=0; setLoop(false);}catch{} } setInterval(async ()=>{ if(!enabled) return; if(state?.voting?.open){ if(aOpen.paused){ try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true); }catch{ if(!triedWavFallback){ triedWavFallback=true; aOpen.src='/assets/voting_open.wav'; try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true);}catch{ setLoop(false); } } else setLoop(false); } } else setLoop(true); }}, 1500); document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') ensureLoop(); }); async function ensureLoop(){ if(!enabled || !state?.voting?.open) return setLoop(false); if(aOpen.paused){ try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true); }catch{ if(!triedWavFallback){ triedWavFallback=true; aOpen.src='/assets/voting_open.wav'; try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true);}catch{ setLoop(false); } } else setLoop(false); } } else setLoop(true); } return { startLoop(){ if(!enabled) return; aOpen.load(); aOpen.currentTime=0; aOpen.play().then(()=>setLoop(true)).catch(()=>setLoop(false)); }, stopOpen, ensureLoop, playEncore(){ safePlay(aEncore); }, playLoser(){ safePlay(aLoser); }, forceEnable };})();
 document.getElementById('play_open').onclick   = async ()=>{ await sfx.forceEnable(); sfx.startLoop(); setTimeout(()=>sfx.stopOpen(), 6000); };
 document.getElementById('play_encore').onclick = async ()=>{ await sfx.forceEnable(); sfx.playEncore(); };
 document.getElementById('play_loser').onclick  = async ()=>{ await sfx.forceEnable(); sfx.playLoser(); };
