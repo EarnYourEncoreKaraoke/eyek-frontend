@@ -286,8 +286,7 @@ function debounce(fn, wait=300){ let t; return (...a)=>{ clearTimeout(t); t=setT
 const $=s=>document.querySelector(s);
 const digitsOnly = s => (s||'').replace(/\D+/g,'');
 
-let clockOffset = 0;
-function nowMs(){ return Date.now() + clockOffset; }
+let clockOffset = 0; function nowMs(){ return Date.now() + clockOffset; }
 function smoothOffset(observed){ if(!isFinite(observed)) return; clockOffset = 0.9*clockOffset + 0.1*observed; }
 
 let state=null, poll=null;
@@ -295,29 +294,19 @@ const lastEdit = Object.create(null);
 const RECENT_MS = 12000;
 function markEdit(id){ lastEdit[id] = Date.now(); }
 function canUpdateField(el, id){ if(document.activeElement === el) return false; if((lastEdit[id]||0) > Date.now()-RECENT_MS) return false; return true; }
-let pollPaused=false, resumeTimer=null;
-function pausePolling(){ pollPaused=true; clearTimeout(resumeTimer); }
+let pollPaused=false, resumeTimer=null; function pausePolling(){ pollPaused=true; clearTimeout(resumeTimer); }
 function resumePollingSoon(){ clearTimeout(resumeTimer); resumeTimer=setTimeout(()=>{ pollPaused=false; }, 1800); }
-let suppressEventRenderUntil = 0;
-function suppressEventRender(ms=1200){ suppressEventRenderUntil = Date.now() + ms; }
+let suppressEventRenderUntil = 0; function suppressEventRender(ms=1200){ suppressEventRenderUntil = Date.now() + ms; }
 function mayRenderEventInputs(){ return Date.now() > suppressEventRenderUntil; }
 
 /* keep setup panel open 30s “peek” when locked */
 let setupPeekUntil = 0;
 const setupPanel = document.getElementById('setupPanel');
-setupPanel.addEventListener('toggle', ()=>{
-  if (setupPanel.open && state?.event?.locked){
-    setupPeekUntil = Date.now() + 30000; // 30s grace
-  }
-});
-setupPanel.querySelector('summary').addEventListener('click', ()=>{
-  if (state?.event?.locked){
-    setupPeekUntil = Date.now() + 30000;
-  }
-});
+setupPanel.addEventListener('toggle', ()=>{ if (setupPanel.open && state?.event?.locked){ setupPeekUntil = Date.now() + 30000; } });
+setupPanel.querySelector('summary').addEventListener('click', ()=>{ if (state?.event?.locked){ setupPeekUntil = Date.now() + 30000; } });
 
 const venue=$('#venue'), venuePublic=$('#venuePublic'), eventDate=$('#eventDate'), kj=$('#kj'), hostName=$('#hostName'), pin=$('#pin');
-const couponText=$('#couponText'), couponLink=$('#couponLink'), couponImage=$('#couponImage'), expiresAt=$('#expiresAt');
+const couponText=$('#couponText'), couponLink=$('#couponLink'), expiresAt=$('#expiresAt');
 const venuesList=document.getElementById('venuesList'), kjsList=document.getElementById('kjsList');
 const singerName=$('#singerName'), songArtist=$('#songArtist');
 const singerList=$('#singerList');
@@ -337,8 +326,7 @@ function spawnMini(containerSel, kind, n=1){
   const cls = kind==='encore'?'g':kind==='another'?'y':'r';
   const W=box.clientWidth, H=box.clientHeight;
   for(let i=0;i<n;i++){
-    const d=document.createElement('div'); d.className='mdot '+cls;
-    d.style.left=(Math.random()*W|0)+'px'; d.style.top='-8px';
+    const d=document.createElement('div'); d.className='mdot '+cls; d.style.left=(Math.random()*W|0)+'px'; d.style.top='-8px';
     box.appendChild(d);
     let x=parseFloat(d.style.left), y=-8, vx=(Math.random()*1.6-0.8), vy=(Math.random()*1.2+0.6);
     const g=0.25, fr=0.82, dt=16;
@@ -353,32 +341,20 @@ function spawnMini(containerSel, kind, n=1){
 }
 
 let lastCounts = { encore:0, another:0, maybe:0 };
-let pendingSpawn = { encore:0, another:0, maybe:0 };
+let pendingSpawn = { encore:0, another:0, maybe:0 }; // suppression for next poll tick
 
 async function fetchState(){
-  const r=await fetch(GET_URL,{cache:'no-store'});
-  const serverFetchedAt = Date.now();
+  const r=await fetch(GET_URL,{cache:'no-store'}); const tClient = Date.now();
   state=await r.json();
-  if(state && typeof state.serverNow === 'number'){
-    const observed = state.serverNow - serverFetchedAt;
-    if(clockOffset === 0) clockOffset = observed; else smoothOffset(observed);
-  }
+  if(state && typeof state.serverNow === 'number'){ smoothOffset(state.serverNow - tClient); }
   // seed defaults
   state.event   ||= {venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false, coupon:{couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}};
   if(!state.event.coupon) state.event.coupon = {couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''};
-  // Fill from localStorage backup if server has blanks (prevents 'disappearing' inputs)
+  // local backup (prevents disappearing on refresh)
   try{
     const cachedEv = JSON.parse(localStorage.getItem('eyek_last_event') || 'null');
-    if(cachedEv){
-      ['venue','venuePublic','date','kj','hostName','pin'].forEach(k=>{
-        if(!state.event[k]) state.event[k] = cachedEv[k] || state.event[k];
-      });
-      state.event.coupon = state.event.coupon || {};
-      if(cachedEv.coupon){
-        ['couponText','couponLink','couponImageUrl','expiresAt'].forEach(k=>{
-          if(!state.event.coupon[k]) state.event.coupon[k] = cachedEv.coupon[k] || state.event.coupon[k];
-        });
-      }
+    if(cachedEv){ ['venue','venuePublic','date','kj','hostName','pin'].forEach(k=>{ if(!state.event[k]) state.event[k] = cachedEv[k] || state.event[k]; });
+      if(cachedEv.coupon){ ['couponText','couponLink','couponImageUrl','expiresAt'].forEach(k=>{ if(!state.event.coupon[k]) state.event.coupon[k] = cachedEv.coupon[k] || state.event.coupon[k]; }); }
     }
   }catch{}
   state.saved   ||= {venues:[], venuesPublic:[], kjs:[]};
@@ -386,11 +362,8 @@ async function fetchState(){
   state.voting  ||= {open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}};
   state.winners ||= {encore:[], another:[], maybe:[]};
 }
-async function postState(){ await fetch('/assets/state.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)}); await fetchState(); }
-const postStateDebounced = debounce(async ()=>{
-  await fetch('/assets/state.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
-  await fetchState(); render();
-}, 220);
+async function postState(){ await fetch(POST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)}); await fetchState(); }
+const postStateDebounced = debounce(async ()=>{ await fetch(POST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)}); await fetchState(); render(); }, 220);
 
 function updateDatalistsImmediate(){
   const Lvenues = JSON.parse(localStorage.getItem('eyek_saved_venues') || '[]');
@@ -403,112 +376,38 @@ function updateDatalistsImmediate(){
   document.getElementById('venuesPublicList').innerHTML = pubs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
   kjsList.innerHTML    = kjs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">`).join('');
 }
-function pushLocalList(key, val){
-  val=(val||'').trim(); if(!val) return;
-  const k = key==='venue' ? 'eyek_saved_venues'
-          : key==='venuePublic' ? 'eyek_saved_venues_public'
-          : 'eyek_saved_kjs';
-  const arr = JSON.parse(localStorage.getItem(k) || '[]');
-  const next = [val, ...arr.filter(x=>x.toLowerCase()!==val.toLowerCase())].slice(0,50);
-  localStorage.setItem(k, JSON.stringify(next));
-  updateDatalistsImmediate();
-}
+function pushLocalList(key, val){ val=(val||'').trim(); if(!val) return; const k = key==='venue' ? 'eyek_saved_venues' : key==='venuePublic' ? 'eyek_saved_venues_public' : 'eyek_saved_kjs'; const arr = JSON.parse(localStorage.getItem(k) || '[]'); const next = [val, ...arr.filter(x=>x.toLowerCase()!==val.toLowerCase())].slice(0,50); localStorage.setItem(k, JSON.stringify(next)); updateDatalistsImmediate(); }
 
 function render(){
-  if(!state) return;
-  updateDatalistsImmediate();
-
-  const canPaint = mayRenderEventInputs();
-
+  if(!state) return; updateDatalistsImmediate(); const canPaint = mayRenderEventInputs();
   if (canPaint && canUpdateField(venue,'venue'))                venue.value       = state.event.venue || '';
   if (canPaint && canUpdateField(venuePublic,'venuePublic'))    venuePublic.value = state.event.venuePublic || '';
   if (canPaint && canUpdateField(eventDate,'eventDate'))        eventDate.value   = state.event.date || new Date().toISOString().slice(0,10);
   if (canPaint && canUpdateField(kj,'kj'))                      kj.value          = state.event.kj || '';
   if (canPaint && canUpdateField(hostName,'hostName'))          hostName.value    = state.event.hostName || '';
   if (canPaint && canUpdateField(pin,'pin'))                    pin.value         = state.event.pin || '';
-
   if (canPaint && canUpdateField(couponText,'couponText'))      couponText.value  = state.event.coupon?.couponText || '';
   if (canPaint && canUpdateField(couponLink,'couponLink'))      couponLink.value  = state.event.coupon?.couponLink || '';
   if (canPaint && canUpdateField(expiresAt,'expiresAt'))        expiresAt.value   = state.event.coupon?.expiresAt || '';
 
-  const disabled = !!state.event.locked;
-  [venue,venuePublic,eventDate,kj,hostName,pin,couponText,couponLink,expiresAt].filter(Boolean).forEach(el=>el.disabled=disabled);
+  const disabled = !!state.event.locked; [venue,venuePublic,eventDate,kj,hostName,pin,couponText,couponLink,expiresAt].filter(Boolean).forEach(el=>el.disabled=disabled);
+  const shouldForceOpen = !disabled || (Date.now() < setupPeekUntil); setupPanel.open = shouldForceOpen; document.getElementById('lockEvent').textContent = disabled ? 'Unlock' : 'Lock';
 
-  // KEEP OPEN if unlocked OR within peek window
-  const shouldForceOpen = !disabled || (Date.now() < setupPeekUntil);
-  setupPanel.open = shouldForceOpen;
+  singerList.innerHTML=''; (state.singers||[]).forEach(s=>{ const row=document.createElement('div'); row.className='pill'; const dot=document.createElement('div'); dot.className='dot '+(s._color||''); const name=document.createElement('div'); name.className='nameTag'; name.textContent=s.name; const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px'; const setB=document.createElement('button'); setB.className='btn smallBtn start'; setB.textContent='Set'; setB.onclick=()=>setCurrent(s.id); const rmB=document.createElement('button'); rmB.className='btn smallBtn warn'; rmB.textContent='Remove'; rmB.onclick=()=>removeSinger(s.id); actions.append(setB,rmB); row.append(dot,name,actions); singerList.append(row); });
 
-  document.getElementById('lockEvent').textContent = disabled ? 'Unlock' : 'Lock';
+  currentName.textContent=state.current.name||'—'; currentSongArtist.disabled=!state.current.id; if(canUpdateField(currentSongArtist,'currentSongArtist')) currentSongArtist.value=state.current.songArtist||'';
 
-  // rotation list
-  singerList.innerHTML='';
-  (state.singers||[]).forEach(s=>{
-    const row=document.createElement('div'); row.className='pill';
-    const dot=document.createElement('div'); dot.className='dot '+(s._color||'');
-    const name=document.createElement('div'); name.className='nameTag'; name.textContent=s.name;
-    const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px';
-    const setB=document.createElement('button'); setB.className='btn smallBtn start'; setB.textContent='Set'; setB.onclick=()=>setCurrent(s.id);
-    const rmB=document.createElement('button'); rmB.className='btn smallBtn warn'; rmB.textContent='Remove'; rmB.onclick=()=>removeSinger(s.id);
-    actions.append(setB,rmB); row.append(dot,name,actions); singerList.append(row);
-  });
+  const ce=state.voting.counts.encore||0, ca=state.voting.counts.another||0, cm=state.voting.counts.maybe||0; cE.textContent=ce; cA.textContent=ca; cM.textContent=cm;
 
-  currentName.textContent=state.current.name||'—';
-  currentSongArtist.disabled=!state.current.id;
-  if(canUpdateField(currentSongArtist,'currentSongArtist')) currentSongArtist.value=state.current.songArtist||'';
+  const tNow = nowMs(); if(!state.voting.open && (state.voting.prepUntil||0) > tNow){ timerEl.textContent = 'Get ready: '+fmt(state.voting.prepUntil - tNow); resultTag.textContent='—'; resultTag.className='resultTag'; } else if(state.voting.open){ timerEl.textContent=fmt(Math.max(0, (state.voting.endsAt||0)-tNow)); resultTag.textContent='Voting…'; resultTag.className='resultTag'; } else { timerEl.textContent='00:00'; announce(state.voting.lastResult); }
 
-  const ce=state.voting.counts.encore||0, ca=state.voting.counts.another||0, cm=state.voting.counts.maybe||0;
-  cE.textContent=ce; cA.textContent=ca; cM.textContent=cm;
-
-  const tNow = nowMs();
-  if(!state.voting.open && (state.voting.prepUntil||0) > tNow){
-    const ms = state.voting.prepUntil - tNow;
-    timerEl.textContent = 'Get ready: '+fmt(ms);
-    resultTag.textContent='—'; resultTag.className='resultTag';
-  } else if(state.voting.open){
-    const ms=Math.max(0, (state.voting.endsAt||0)-tNow);
-    timerEl.textContent=fmt(ms);
-    resultTag.textContent='Voting…'; resultTag.className='resultTag';
-  } else {
-    timerEl.textContent='00:00'; announce(state.voting.lastResult);
-  }
-
-  // enable/disable host vote buttons ONLY while open
-  const votingOpen = !!state.voting.open;
-  ['hv_encore','hv_another','hv_maybe'].forEach(id=>{
-    const b=document.getElementById(id);
-    b.disabled = !votingOpen;
-    b.style.opacity = votingOpen ? '1' : '.6';
-  });
+  const votingOpen = !!state.voting.open; ['hv_encore','hv_another','hv_maybe'].forEach(id=>{ const b=document.getElementById(id); b.disabled = !votingOpen; b.style.opacity = votingOpen ? '1' : '.6'; });
 }
 function fmt(ms){ const s=Math.ceil(ms/1000); const m=Math.floor(s/60), r=s%60; return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}` }
-function announce(w){
-  if(!w){ resultTag.textContent='—'; resultTag.className='resultTag'; return;}
-  if(w==='encore'){ resultTag.textContent='Encore!'; resultTag.className='resultTag r-encore'; }
-  else if(w==='another'){ resultTag.textContent='Another Shot!'; resultTag.className='resultTag r-another'; }
-  else { resultTag.textContent='Maybe Next Time'; resultTag.className='resultTag r-maybe'; }
-}
+function announce(w){ if(!w){ resultTag.textContent='—'; resultTag.className='resultTag'; return;} if(w==='encore'){ resultTag.textContent='Encore!'; resultTag.className='resultTag r-encore'; } else if(w==='another'){ resultTag.textContent='Another Shot!'; resultTag.className='resultTag r-another'; } else { resultTag.textContent='Maybe Next Time'; resultTag.className='resultTag r-maybe'; } }
 
-function bindLive(el, key, transform=(x)=>x, immediate=false){
-  if(!el) return;
-  const handler = async ()=>{
-    if(!state?.event) return;
-    const val = transform(el.value);
-    el.value = val;
-    if(key.startsWith('coupon.')){
-      state.event.coupon = state.event.coupon || {couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''};
-      state.event.coupon[key.split('.')[1]] = val;
-    }else{
-      state.event[key] = val;
-    }
-    try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{}
-    markEdit(el.id);
-    suppressEventRender(900);
-    if(immediate){ await postState(); showPinSaved(key); } else { postStateDebounced(); }
-  };
-  el.addEventListener('input', handler);
-  el.addEventListener('change', handler);
-  el.addEventListener('blur', ()=>{ if(key==='venue'||key==='venuePublic'||key==='kj'){ pushLocalList(key, el.value); }});
-}
+function bindLive(el, key, transform=(x)=>x, immediate=false){ if(!el) return; const handler = async ()=>{ if(!state?.event) return; const val = transform(el.value); el.value = val; if(key.startsWith('coupon.')){ state.event.coupon = state.event.coupon || {couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}; state.event.coupon[key.split('.')[1]] = val; }else{ state.event[key] = val; } try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{} markEdit(el.id); suppressEventRender(900); if(immediate){ await postState(); showPinSaved(key); } else { postStateDebounced(); } }; el.addEventListener('input', handler); el.addEventListener('change', handler); el.addEventListener('blur', ()=>{ if(key==='venue'||key==='venuePublic'||key==='kj'){ pushLocalList(key, el.value); }}); }
+
 bindLive(venue,       'venue');
 bindLive(venuePublic, 'venuePublic');
 bindLive(eventDate,   'date');
@@ -522,234 +421,67 @@ bindLive(expiresAt,   'coupon.expiresAt');
 function showPinSaved(key){ if(key!=='pin') return; pinSaved.textContent='PIN saved'; setTimeout(()=>pinSaved.textContent='',1200); }
 togglePin.onclick = ()=>{ pin.type = (pin.type==='password'?'text':'password'); togglePin.textContent = (pin.type==='password'?'Show':'Hide'); };
 
-document.getElementById('saveEvent').onclick = async ()=>{
-  pushLocalList('venue', venue.value);
-  pushLocalList('venuePublic', venuePublic.value);
-  pushLocalList('kj', kj.value);
-  try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{}
-  await postState(); const m=document.getElementById('eventSavedMsg'); m.textContent='Saved!'; setTimeout(()=>m.textContent='',1400);
-};
-document.getElementById('lockEvent').onclick = async ()=>{
-  state.event.locked = !state.event.locked;
-  await postState();
-};
-document.getElementById('resetEvent').onclick = async ()=>{
-  if(state.event.locked){ alert('Unlock to reset.'); return;}
-  if(!confirm('Reset this event? This clears singers & votes.')) return;
-  state={ serverUpdatedAt: Date.now()/1000|0,
-    event:{venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false, coupon:{couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}},
-    saved:{venues: state.saved?.venues ?? [], kjs: state.saved?.kjs ?? [], venuesPublic: state.saved?.venuesPublic ?? []},
-    singers:[], current:{id:null,name:'',songArtist:''},
-    voting:{open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}},
-    winners:{encore:[], another:[], maybe:[]}
-  };
-  try{ localStorage.removeItem('eyek_last_event'); }catch{}
-  await postState();
-};
+document.getElementById('saveEvent').onclick = async ()=>{ pushLocalList('venue', venue.value); pushLocalList('venuePublic', venuePublic.value); pushLocalList('kj', kj.value); try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{} await postState(); const m=document.getElementById('eventSavedMsg'); m.textContent='Saved!'; setTimeout(()=>m.textContent='',1400); };
+document.getElementById('lockEvent').onclick = async ()=>{ state.event.locked = !state.event.locked; await postState(); };
+document.getElementById('resetEvent').onclick = async ()=>{ if(state.event.locked){ alert('Unlock to reset.'); return;} if(!confirm('Reset this event? This clears singers & votes.')) return; state={ serverUpdatedAt: Date.now()/1000|0, event:{venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false, coupon:{couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}}, saved:{venues: state.saved?.venues ?? [], kjs: state.saved?.kjs ?? [], venuesPublic: state.saved?.venuesPublic ?? []}, singers:[], current:{id:null,name:'',songArtist:''}, voting:{open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}}, winners:{encore:[], another:[], maybe:[]} }; try{ localStorage.removeItem('eyek_last_event'); }catch{} await postState(); };
 
-document.getElementById('addSinger').onclick = async ()=>{
-  const name=singerName.value.trim(); if(!name){ alert('Enter a singer name.'); return;}
-  const id='s_'+Math.random().toString(36).slice(2,9);
-  state.singers.push({id,name,_color:''});
-  singerName.value=''; songArtist.value='';
-  await postState();
-};
-async function logPerformance(action){
-  try{ await fetch(PERF_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,when:new Date().toISOString(),singer:state.current?.name||'',song:state.current?.songArtist||''})}); }catch(e){}
-}
-function setCurrent(id){
-  const s = state.singers.find(x=>x.id===id); if(!s) return;
-  // FULL reset for the new round
-  state.voting = { open:false, prepUntil:0, endsAt:0, extendCount:0,
-                   counts:{encore:0,another:0,maybe:0}, lastResult:null, voters:{} };
-  lastCounts = {encore:0,another:0,maybe:0};
-  pendingSpawn = {encore:0,another:0,maybe:0};
-  state.current = { id:s.id, name:s.name, songArtist:'' };
-  postState();
-  logPerformance('set_current');
-}
+document.getElementById('addSinger').onclick = async ()=>{ const name=singerName.value.trim(); if(!name){ alert('Enter a singer name.'); return;} const id='s_'+Math.random().toString(36).slice(2,9); state.singers.push({id,name,_color:''}); singerName.value=''; songArtist.value=''; await postState(); };
+async function logPerformance(action){ try{ await fetch(PERF_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,when:new Date().toISOString(),singer:state.current?.name||'',song:state.current?.songArtist||''})}); }catch(e){} }
+function setCurrent(id){ const s = state.singers.find(x=>x.id===id); if(!s) return; state.voting = { open:false, prepUntil:0, endsAt:0, extendCount:0, counts:{encore:0,another:0,maybe:0}, lastResult:null, voters:{} }; lastCounts = {encore:0,another:0,maybe:0}; pendingSpawn = {encore:0,another:0,maybe:0}; state.current = { id:s.id, name:s.name, songArtist:'' }; postState(); logPerformance('set_current'); }
+function removeSinger(id){ state.singers=state.singers.filter(x=>x.id!==id); if(state.current.id===id){ state.current={id:null,name:'',songArtist:''}; } postState(); }
+currentSongArtist.addEventListener('input', async ()=>{ if(!state.current.id) return; state.current.songArtist=currentSongArtist.value.trim(); markEdit('currentSongArtist'); await postState(); });
 
-function removeSinger(id){
-  state.singers=state.singers.filter(x=>x.id!==id);
-  if(state.current.id===id){ state.current={id:null,name:'',songArtist:''}; }
-  postState();
-}
-currentSongArtist.addEventListener('input', async ()=>{
-  if(!state.current.id) return;
-  state.current.songArtist=currentSongArtist.value.trim();
-  markEdit('currentSongArtist');
-  await postState();
-});
-
-document.getElementById('startVote').onclick = async ()=>{
-  if(!state.current.id){ alert('Set a current singer first.'); return; }
-  const t=nowMs();
-  state.voting={ open:false, prepUntil: t+5000, endsAt:0, extendCount:0, counts:{encore:0,another:0,maybe:0}, lastResult:null, voters:{} };
-  lastCounts = {encore:0,another:0,maybe:0};
-  pendingSpawn = {encore:0,another:0,maybe:0};
-  await postState();
-  logPerformance('start_round');
-};
-document.getElementById('extendVote').onclick = async ()=>{
-  if(!state.voting.open) return;
-  state.voting.endsAt+=15000; state.voting.extendCount++;
-  await postState();
-};
+document.getElementById('startVote').onclick = async ()=>{ if(!state.current.id){ alert('Set a current singer first.'); return; } const t=nowMs(); state.voting={ open:false, prepUntil: t+5000, endsAt:0, extendCount:0, counts:{encore:0,another:0,maybe:0}, lastResult:null, voters:{} }; lastCounts = {encore:0,another:0,maybe:0}; pendingSpawn = {encore:0,another:0,maybe:0}; await postState(); logPerformance('start_round'); };
+document.getElementById('extendVote').onclick = async ()=>{ if(!state.voting.open) return; state.voting.endsAt+=15000; state.voting.extendCount++; await postState(); };
 document.getElementById('endVote').onclick = async ()=>{ await concludeVoting(); };
 
-function deviceId(){ let id=localStorage.getItem('eyek_device_id'); if(!id){ id=crypto.randomUUID(); localStorage.setItem('eyek_device_id', id);} return id; }
-async function hostVote(kind){
-  if(!(state?.voting?.open)) return;
-
-  // visual: drop a ball immediately on host
-  const map = {encore:'#miniE', another:'#miniA', maybe:'#miniM'};
+function deviceId(){ let id=localStorage.getItem('eyek_device_id'); if(!id){ id=(crypto?.randomUUID?.()||('d_'+Math.random().toString(36).slice(2,11))); localStorage.setItem('eyek_device_id', id);} return id; }
+async function hostVote(kind){ if(!(state?.voting?.open)) return; const map = {encore:'#miniE', another:'#miniA', maybe:'#miniM'};
+  // Optimistic suppression: assume one server increment will arrive next tick
+  pendingSpawn[kind] = (pendingSpawn[kind]||0) + 1;
+  // Local visual feedback immediately
   spawnMini(map[kind], kind, 1);
-
-  // submit to server
+  // Send to server
   try{
-    const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice:kind, deviceId:deviceId()})});
-    if(res.ok){ pendingSpawn[kind] = (pendingSpawn[kind]||0) + 1;
-      // quick button highlight
+    const res=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ choice:kind, deviceId:deviceId() })});
+    if(!res.ok){ const e=await res.json().catch(()=>({error:'vote_failed'})); if(e.error==='already_voted'){ alert('Only one vote per device per singer.'); }
+      // Revert suppression if the vote failed
+      pendingSpawn[kind] = Math.max(0, (pendingSpawn[kind]||1) - 1);
+    } else {
+      // Button highlight
       document.querySelectorAll('.voteBtn').forEach(b=>b.classList.remove('selected'));
       const btnId = kind==='encore'?'hv_encore':kind==='another'?'hv_another':'hv_maybe';
       const btn=document.getElementById(btnId); btn.classList.add('selected'); setTimeout(()=>btn.classList.remove('selected'),1200);
-    }else{
-      const e=await res.json().catch(()=>({error:'vote_failed'}));
-      if(e.error==='already_voted'){ alert('Only one vote per device per singer.'); }
     }
-  }finally{
-    await fetchState(); render();
-  }
+  } catch(e){
+    pendingSpawn[kind] = Math.max(0, (pendingSpawn[kind]||1) - 1);
+  } finally { await fetchState(); render(); }
 }
 document.getElementById('hv_encore').onclick = ()=>hostVote('encore');
 document.getElementById('hv_another').onclick = ()=>hostVote('another');
 document.getElementById('hv_maybe').onclick  = ()=>hostVote('maybe');
 
-async function concludeVoting(){
-  if(!state.voting.open){ announce(state.voting.lastResult); return; }
-  state.voting.open=false; state.voting.endsAt=0;
+async function concludeVoting(){ if(!state.voting.open){ announce(state.voting.lastResult); return; } state.voting.open=false; state.voting.endsAt=0; const {encore=0,another=0,maybe=0} = state.voting.counts||{}; const max = Math.max(encore,another,maybe); const tied = []; if(encore===max) tied.push('encore'); if(another===max) tied.push('another'); if(maybe===max) tied.push('maybe'); let winner; if(tied.length===1){ winner = tied[0]; }else{ if(tied.includes('encore') && tied.includes('another')) winner='encore'; else if(tied.includes('another')) winner='another'; else winner='maybe'; } state.voting.lastResult=winner; const cur=state.singers.find(s=>s.id===state.current.id); const nowISO = new Date().toISOString(); if(cur){ if(winner==='maybe'){ state.singers=state.singers.filter(s=>s.id!==cur.id); state.winners.maybe.unshift({when:nowISO, name:cur.name, song:state.current.songArtist||''}); state.winners.maybe = state.winners.maybe.slice(0,200); } else { cur._color=(winner==='encore'?'green':'yellow'); state.winners[winner].unshift({when:nowISO, name:state.current.name, song:state.current.songArtist||''}); state.winners[winner]=state.winners[winner].slice(0,200); } } state.current = { id:null, name:'', songArtist:'' }; await postState(); announce(winner); sfx.stopOpen(); if (winner === 'encore') setTimeout(()=>sfx.playEncore(),120); else if (winner === 'maybe') setTimeout(()=>sfx.playLoser(),120); }
 
-  // tie-breaks
-  const {encore=0,another=0,maybe=0} = state.voting.counts||{};
-  const max = Math.max(encore,another,maybe);
-  const tied = [];
-  if(encore===max) tied.push('encore');
-  if(another===max) tied.push('another');
-  if(maybe===max) tied.push('maybe');
-  let winner;
-  if(tied.length===1){
-    winner = tied[0];
-  }else{
-    if(tied.includes('encore') && tied.includes('another')) winner='encore';
-    else if(tied.includes('another')) winner='another';
-    else winner='maybe';
-  }
-  state.voting.lastResult=winner;
-
-  const cur=state.singers.find(s=>s.id===state.current.id);
-  const nowISO = new Date().toISOString();
-  if(cur){
-    if(winner==='maybe'){
-      state.singers=state.singers.filter(s=>s.id!==cur.id);
-      state.winners.maybe.unshift({when:nowISO, name:cur.name, song:state.current.songArtist||''});
-      state.winners.maybe = state.winners.maybe.slice(0,200);
-    } else {
-      cur._color=(winner==='encore'?'green':'yellow');
-      state.winners[winner].unshift({when:nowISO, name:state.current.name, song:state.current.songArtist||''});
-      state.winners[winner]=state.winners[winner].slice(0,200);
-    }
-  }
-  state.current = { id:null, name:'', songArtist:'' };
-
-  await postState(); announce(winner);
-
-  sfx.stopOpen();
-  if (winner === 'encore') setTimeout(()=>sfx.playEncore(),120);
-  else if (winner === 'maybe') setTimeout(()=>sfx.playLoser(),120);
-}
-
-function loop(){
-  if(poll) clearInterval(poll);
-  poll=setInterval(async ()=>{
-    if(pollPaused) return;
-    await fetchState();
-    const t=nowMs();
-    if(!state.voting.open && (state.voting.prepUntil||0) > 0 && t >= state.voting.prepUntil){
-      state.voting.open = true;
-      state.voting.prepUntil = 0;
-      state.voting.endsAt = t + 30000;
-      await postState();
-      sfx.startLoop();
-    }
-    if(state?.voting?.open && t>=state.voting.endsAt){
-      await concludeVoting();
-    } else {
-      // detect count increases and spawn mini balls (avoid double-spawn from host)
-      const ce=state?.voting?.counts?.encore||0, ca=state?.voting?.counts?.another||0, cm=state?.voting?.counts?.maybe||0;
-      let incE = ce - lastCounts.encore; if(incE>0){ incE = Math.max(0, incE - (pendingSpawn.encore||0)); pendingSpawn.encore = 0; if(incE>0) spawnMini('#miniE','encore', incE); }
-      let incA = ca - lastCounts.another; if(incA>0){ incA = Math.max(0, incA - (pendingSpawn.another||0)); pendingSpawn.another = 0; if(incA>0) spawnMini('#miniA','another', incA); }
-      let incM = cm - lastCounts.maybe; if(incM>0){ incM = Math.max(0, incM - (pendingSpawn.maybe||0)); pendingSpawn.maybe = 0; if(incM>0) spawnMini('#miniM','maybe', incM); }
-      lastCounts={encore:ce,another:ca,maybe:cm};
-
-      render();
-      if(state.voting.open) sfx.ensureLoop(); else sfx.stopOpen();
-    }
-  }, 1000);
-}
+function loop(){ if(poll) clearInterval(poll); poll=setInterval(async ()=>{ if(pollPaused) return; await fetchState(); const t=nowMs(); if(!state.voting.open && (state.voting.prepUntil||0) > 0 && t >= state.voting.prepUntil){ state.voting.open = true; state.voting.prepUntil = 0; state.voting.endsAt = t + 30000; await postState(); sfx.startLoop(); }
+  if(state?.voting?.open && t>=state.voting.endsAt){ await concludeVoting(); } else {
+    // detect count increases and spawn mini balls (subtract optimistic host spawns)
+    const ce=state?.voting?.counts?.encore||0, ca=state?.voting?.counts?.another||0, cm=state?.voting?.counts?.maybe||0;
+    let incE = ce - lastCounts.encore; if(incE>0){ const sup=pendingSpawn.encore||0; incE = Math.max(0, incE - sup); pendingSpawn.encore = Math.max(0, sup - (ce - lastCounts.encore)); if(incE>0) spawnMini('#miniE','encore', incE); }
+    let incA = ca - lastCounts.another; if(incA>0){ const sup=pendingSpawn.another||0; incA = Math.max(0, incA - sup); pendingSpawn.another = Math.max(0, sup - (ca - lastCounts.another)); if(incA>0) spawnMini('#miniA','another', incA); }
+    let incM = cm - lastCounts.maybe; if(incM>0){ const sup=pendingSpawn.maybe||0; incM = Math.max(0, incM - sup); pendingSpawn.maybe = Math.max(0, sup - (cm - lastCounts.maybe)); if(incM>0) spawnMini('#miniM','maybe', incM); }
+    lastCounts={encore:ce,another:ca,maybe:cm}; render(); if(state.voting.open) sfx.ensureLoop(); else sfx.stopOpen(); }
+}, 750); } // poll faster for snappier visuals
 
 /* ---- Audio ---- */
-const sfx = (function(){
-  let enabled=false;
-  const aOpen   = new Audio('/assets/voting_open.mp3'); aOpen.loop = true; aOpen.preload='auto';
-  const aEncore = new Audio('/assets/encore.mp3');      aEncore.preload='auto';
-  const aLoser  = new Audio('/assets/loser.wav');       aLoser.preload='auto';
-  let triedWavFallback=false;
-  const btn = document.getElementById('enableSound');
-  const statusEl  = document.getElementById('soundStatus');
-  const loopEl    = document.getElementById('loopStatus');
-  function setStatus(){ statusEl.innerHTML = 'Sound: <b>'+(enabled?'on':'off')+'</b>'; }
-  function setLoop(v){ loopEl.innerHTML = 'Loop: <b>'+(v?'playing':'stopped')+'</b>'; }
-  let ctx=null;
-  function waPing(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(), g=ctx.createGain(); g.gain.value=0.0001; o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.02); return true; }catch{ return false; } }
-  async function warm(el){ try{ el.muted=true; await el.play(); el.pause(); el.currentTime=0; el.muted=false; return true; }catch{ return false; } }
-  async function enable(){ const ok = waPing() | await warm(aEncore) | await warm(aLoser) | await warm(aOpen); enabled = !!ok; setStatus(); if(enabled){ btn.classList.remove('callout','start'); btn.classList.add('end'); btn.textContent='Disable sound'; } return enabled; }
-  function disable(){ enabled=false; setStatus(); stopOpen(); btn.classList.remove('end'); btn.classList.add('start','callout'); btn.textContent='Enable sound'; }
-  btn.addEventListener('click', async ()=>{ if(!enabled) await enable(); else disable(); });
-  async function forceEnable(){ if(!enabled) await enable(); }
-  function safePlay(a){ if(!enabled) return; a.play().then(()=>setLoop(!a.paused)).catch(()=>setLoop(false)); }
-  function stopOpen(){ try{ aOpen.pause(); aOpen.currentTime=0; setLoop(false);}catch{} }
-  setInterval(async ()=>{ if(!enabled) return; if(state?.voting?.open){ if(aOpen.paused){ try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true); }catch{ if(!triedWavFallback){ triedWavFallback=true; aOpen.src='/assets/voting_open.wav'; try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true);}catch{ setLoop(false); } } else setLoop(false); } } else setLoop(true); }}, 1500);
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') ensureLoop(); });
-  async function ensureLoop(){ if(!enabled || !state?.voting?.open) return setLoop(false); if(aOpen.paused){ try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true); }catch{ if(!triedWavFallback){ triedWavFallback=true; aOpen.src='/assets/voting_open.wav'; try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true);}catch{ setLoop(false); } } else setLoop(false); } } else setLoop(true); }
-  return { startLoop(){ if(!enabled) return; aOpen.load(); aOpen.currentTime=0; aOpen.play().then(()=>setLoop(true)).catch(()=>setLoop(false)); }, stopOpen, ensureLoop, playEncore(){ safePlay(aEncore); }, playLoser(){ safePlay(aLoser); }, forceEnable };
+const sfx = (function(){ let enabled=false; const aOpen=new Audio('/assets/voting_open.mp3'); aOpen.loop = true; aOpen.preload='auto'; const aEncore=new Audio('/assets/encore.mp3'); aEncore.preload='auto'; const aLoser=new Audio('/assets/loser.wav'); aLoser.preload='auto'; let triedWavFallback=false; const btn=document.getElementById('enableSound'); const statusEl=document.getElementById('soundStatus'); const loopEl=document.getElementById('loopStatus'); function setStatus(){ statusEl.innerHTML = 'Sound: <b>'+(enabled?'on':'off')+'</b>'; } function setLoop(v){ loopEl.innerHTML = 'Loop: <b>'+(v?'playing':'stopped')+'</b>'; } let ctx=null; function waPing(){ try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(), g=ctx.createGain(); g.gain.value=0.0001; o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.02); return true; }catch{ return false; } } async function warm(el){ try{ el.muted=true; await el.play(); el.pause(); el.currentTime=0; el.muted=false; return true; }catch{ return false; } } async function enable(){ const ok = waPing() | await warm(aEncore) | await warm(aLoser) | await warm(aOpen); enabled = !!ok; setStatus(); if(enabled){ btn.classList.remove('callout','start'); btn.classList.add('end'); btn.textContent='Disable sound'; } return enabled; } function disable(){ enabled=false; setStatus(); stopOpen(); btn.classList.remove('end'); btn.classList.add('start','callout'); btn.textContent='Enable sound'; } btn.addEventListener('click', async ()=>{ if(!enabled) await enable(); else disable(); }); async function forceEnable(){ if(!enabled) await enable(); } function safePlay(a){ if(!enabled) return; a.play().then(()=>setLoop(!a.paused)).catch(()=>setLoop(false)); } function stopOpen(){ try{ aOpen.pause(); aOpen.currentTime=0; setLoop(false);}catch{} } setInterval(async ()=>{ if(!enabled) return; if(state?.voting?.open){ if(aOpen.paused){ try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true); }catch{ if(!triedWavFallback){ triedWavFallback=true; aOpen.src='/assets/voting_open.wav'; try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true);}catch{ setLoop(false); } } else setLoop(false); } } else setLoop(true); }}, 1500); document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') ensureLoop(); }); async function ensureLoop(){ if(!enabled || !state?.voting?.open) return setLoop(false); if(aOpen.paused){ try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true); }catch{ if(!triedWavFallback){ triedWavFallback=true; aOpen.src='/assets/voting_open.wav'; try{ aOpen.load(); aOpen.currentTime=0; await aOpen.play(); setLoop(true);}catch{ setLoop(false); } } else setLoop(false); } } else setLoop(true); } return { startLoop(){ if(!enabled) return; aOpen.load(); aOpen.currentTime=0; aOpen.play().then(()=>setLoop(true)).catch(()=>setLoop(false)); }, stopOpen, ensureLoop, playEncore(){ safePlay(aEncore); }, playLoser(){ safePlay(aLoser); }, forceEnable };
 })();
 document.getElementById('play_open').onclick   = async ()=>{ await sfx.forceEnable(); sfx.startLoop(); setTimeout(()=>sfx.stopOpen(), 6000); };
 document.getElementById('play_encore').onclick = async ()=>{ await sfx.forceEnable(); sfx.playEncore(); };
 document.getElementById('play_loser').onclick  = async ()=>{ await sfx.forceEnable(); sfx.playLoser(); };
 
-/* Coupon submit (image upload to Firebase can be added later) */
-(function(){
-  const btn = document.getElementById('submitCoupon');
-  if(!btn) return;
-  const msg = document.getElementById('couponSubmitMsg');
-  btn.addEventListener('click', async ()=>{
-    try{
-      const t = document.getElementById('couponText')?.value?.trim() || '';
-      const l = document.getElementById('couponLink')?.value?.trim() || '';
-      const e = document.getElementById('expiresAt')?.value || '';
-      if(!t){ msg.textContent='Please enter Coupon Text.'; return; }
-      state.event = state.event || {};
-      state.event.coupon = Object.assign({couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}, state.event.coupon||{});
-      state.event.coupon.couponText = t;
-      state.event.coupon.couponLink  = l;
-      state.event.coupon.expiresAt   = e;
-      try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{}
-      await postState();
-      msg.textContent='Coupon saved.';
-      setTimeout(()=>{ msg.textContent=''; }, 2500);
-    }catch(err){ console.error(err); msg.textContent='Save failed.'; setTimeout(()=>{ msg.textContent=''; }, 2500); }
-  });
-})();
+/* Coupon submit (local mirror; your Firebase submitter can replace this later) */
+(function(){ const btn = document.getElementById('submitCoupon'); if(!btn) return; const msg = document.getElementById('couponSubmitMsg'); btn.addEventListener('click', async ()=>{ try{ const t=document.getElementById('couponText')?.value?.trim()||''; const l=document.getElementById('couponLink')?.value?.trim()||''; const e=document.getElementById('expiresAt')?.value||''; if(!t){ msg.textContent='Please enter Coupon Text.'; return; } state.event = state.event || {}; state.event.coupon = Object.assign({couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}, state.event.coupon||{}); state.event.coupon.couponText=t; state.event.coupon.couponLink=l; state.event.coupon.expiresAt=e; try{ localStorage.setItem('eyek_last_event', JSON.stringify(state.event)); }catch{} await postState(); msg.textContent='Coupon saved.'; setTimeout(()=>{ msg.textContent=''; }, 2500); }catch(err){ console.error(err); msg.textContent='Save failed.'; setTimeout(()=>{ msg.textContent=''; }, 2500); } }); })();
 
 (async function init(){ await fetchState(); render(); loop(); })();
 </script>
