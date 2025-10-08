@@ -3,7 +3,7 @@ name: Deploy to SiteGround via SFTP
 on:
   push:
     branches:
-      - main  # Change this if you deploy from a different branch
+      - main
 
 jobs:
   deploy:
@@ -20,9 +20,9 @@ jobs:
       - name: Deploy via SFTP
         uses: easingthemes/ssh-deploy@v2.2.11
         with:
-          ssh-private-key: ${{ secrets.SFTP_PRIVATE_KEY }}
-          remote-user: ${{ secrets.SFTP_USERNAME }}
-          server-ip: ${{ secrets.SFTP_HOST }}
-          remote-port: ${{ secrets.SFTP_PORT }}
-          remote-path: ${{ secrets.SFTP_PATH }}
-          local-path: ./dist  # Change this if your deployable files are in a different folder
+          SSH_PRIVATE_KEY: ${{ secrets.SFTP_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SFTP_HOST }}
+          REMOTE_USER: ${{ secrets.SFTP_USERNAME }}
+          REMOTE_PORT: ${{ secrets.SFTP_PORT }}
+          SOURCE: ./dist
+          TARGET: ${{ secrets.SFTP_PATH }}
