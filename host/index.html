@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Encore! • Host</title>
+<title>Encore! • Host [BUILD-2025-10-08-A]</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -25,7 +25,8 @@
   input,select,button{font:inherit}
   input, select{width:100%; padding:10px 12px; border-radius:10px; border:1px solid #5b3d87; background:#200d3c; color:#fff; outline:none}
   input[disabled]{opacity:.6}
-  .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  /* Force grid rows even if a rogue stylesheet overrides .row */
+  .row{display:grid !important; grid-template-columns:1fr 1fr; gap:10px}
   .row-60-40{display:grid; grid-template-columns:3fr 2fr; gap:12px}
   @media (max-width:900px){ .row, .row-60-40{grid-template-columns:1fr} }
   .btn{appearance:none; border:1px solid #5b3d87; background:#2a1352; color:#fff; padding:10px 12px; border-radius:12px; cursor:pointer}
@@ -47,7 +48,7 @@
   .xl{font-size:28px}
   .currentBox{background:#220d3f;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:8px}
   .currentBox .big{font-weight:900;font-size:30px}
-  .miniWhite{background:#fff;border-radius:12px;padding:8px;color:#111;font-weight:800}
+  .miniWhite{background:#fff;color:#111;padding:8px;border-radius:12px}
   .mdots{position:relative;height:120px;border-radius:12px;background:#1c0e33;border:1px dashed #6f52a8;overflow:hidden}
   .mdot{position:absolute;width:8px;height:8px;border-radius:999px;opacity:.9;mix-blend-mode:screen}
   .mdot.g{background:var(--green)} .mdot.y{background:var(--yellow)} .mdot.r{background:var(--red)}
@@ -64,7 +65,7 @@
 
   <!-- Left: Event & Saved -->
   <div class="col">
-    <h1>Host Control</h1>
+    <h1>Host Control <span class="tiny" id="buildId">· Host build: BUILD-2025-10-08-A</span></h1>
 
     <details class="card" id="setupPanel" open>
       <summary>Event &amp; KJ Information</summary>
@@ -301,6 +302,8 @@
 </div>
 
 <script>
+console.log('HOST BUILD: BUILD-2025-10-08-A');
+
 const GET_URL  = '/assets/get_state.php';
 const POST_URL = '/assets/state.php';
 const VOTE_URL = '/assets/vote.php';
@@ -381,10 +384,7 @@ function spawnMini(containerSel, kind, n=1){
 let lastCounts = { encore:0, another:0, maybe:0 };
 
 let clockOffset = 0;
-function smoothOffset(obs){
-  // EMA adjust
-  clockOffset = clockOffset*0.9 + obs*0.1;
-}
+function smoothOffset(obs){ clockOffset = clockOffset*0.9 + obs*0.1; }
 
 async function fetchState(){
   const r=await fetch(GET_URL,{cache:'no-store'});
@@ -394,7 +394,6 @@ async function fetchState(){
     const observed = state.serverNow - serverFetchedAt;
     if(clockOffset === 0) clockOffset = observed; else smoothOffset(observed);
   }
-  // seed defaults
   state.event   ||= {venue:'',venuePublic:'',date:new Date().toISOString().slice(0,10),kj:'',hostName:'',pin:'',locked:false, coupon:{couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''}};
   if(!state.event.coupon) state.event.coupon = {couponText:'',couponLink:'',couponImageUrl:'',expiresAt:''};
   state.saved   ||= {venues:[], venuesPublic:[], kjs:[]};
@@ -402,7 +401,6 @@ async function fetchState(){
   state.voting  ||= {open:false,prepUntil:0,endsAt:0,extendCount:0,counts:{encore:0,another:0,maybe:0},lastResult:null,voters:{}};
   state.winners ||= {encore:[], another:[], maybe:[]};
 
-  // paint setup fields (with edit guards)
   const canPaint = !state.event.locked;
   if (canPaint && canUpdateField(venue,'venue'))               venue.value       = state.event.venue || '';
   if (canPaint && canUpdateField(venuePublic,'venuePublic'))   venuePublic.value = state.event.venuePublic || '';
@@ -414,7 +412,6 @@ async function fetchState(){
   const disabled = !!state.event.locked;
   [venue,venuePublic,eventDate,kj,hostName,pin,document.getElementById('couponText'),document.getElementById('couponLink'),document.getElementById('expiresAt'),document.getElementById('couponImage')].filter(Boolean).forEach(el=>el.disabled=disabled);
 
-  // KEEP OPEN if unlocked 
   const sum = setupPanel.querySelector('summary');
   if(!state.event.locked){
     const wantOpen = Date.now() < setupPeekUntil;
@@ -424,7 +421,6 @@ async function fetchState(){
     sum.classList.add('ghost');
   }
 
-  // rotation list
   singerList.innerHTML='';
   (state.singers||[]).forEach(s=>{
     const row=document.createElement('div'); row.className='pill';
@@ -456,15 +452,12 @@ async function fetchState(){
     timerEl.textContent='00:00'; announce(state.voting.lastResult);
   }
 
-  // Title & now
   eventTitle.textContent = (state.event.venuePublic||state.event.venue||'') + (state.current?.name? ' • Now: '+state.current.name : '');
   nowTs.textContent = new Date().toLocaleTimeString();
 
-  // Winners
   wEncore.textContent = (state.winners.encore||[]).join(', ');
   wAnother.textContent = (state.winners.another||[]).join(', ');
 
-  // mini dots for deltas
   const dE = Math.max(0, ce-lastCounts.encore), dA=Math.max(0, ca-lastCounts.another), dM=Math.max(0, cm-lastCounts.maybe);
   if(dE) spawnMini('#miniDots','encore', dE);
   if(dA) spawnMini('#miniDots','another', dA);
@@ -497,7 +490,6 @@ bindLive(eventDate,   'date');
 bindLive(kj,          'kj');
 bindLive(hostName,    'hostName');
 bindLive(pin,         'pin');
-// promo removed
 
 document.getElementById('saveEvent').onclick = async ()=>{
   pushLocalList('venue', venue.value);
@@ -534,7 +526,6 @@ document.getElementById('resetEvent').onclick = async ()=>{
     const expiresAt  = $('expiresAt')?.value || '';
     const file       = $('couponImage')?.files?.[0] || null;
     if(!couponText){ msg.textContent='Please enter Coupon Text (link/image optional).'; return; }
-    // Save into state.event.coupon (image upload will be added with Firebase Storage)
     state.event.coupon = Object.assign({}, state.event.coupon||{}, {
       couponText, couponLink, expiresAt
     });
@@ -578,7 +569,6 @@ async function logPerformance(action){
 }
 function setCurrent(id){
   const s = state.singers.find(x=>x.id===id); if(!s) return;
-  // FULL reset for the new round
   state.voting = { open:false, prepUntil:0, endsAt:0, extendCount:0,
                    counts:{encore:0,another:0,maybe:0}, lastResult:null, voters:{} };
   lastCounts = {encore:0,another:0,maybe:0};
@@ -650,17 +640,14 @@ function endVoting(){
   if(!state.voting.open) return;
   state.voting.open=false;
   state.voting.prepUntil=0;
-  // calculate winner per tie rules
   const ce=state.voting.counts.encore|0, ca=state.voting.counts.another|0, cm=state.voting.counts.maybe|0;
   let winner='maybe';
-  // highest count wins
   const max=Math.max(ce,ca,cm);
   const tieE=ce===max, tieA=ca===max, tieM=cm===max;
   if(tieE && !tieA && !tieM){ winner='encore'; }
   else if(!tieE && tieA && !tieM){ winner='another'; }
   else if(!tieE && !tieA && tieM){ winner='maybe'; }
   else {
-    // tie-break logic
     if(tieE && tieA && !tieM) winner='encore';
     else if(!tieE && tieA && tieM) winner='another';
     else if(tieE && tieA && tieM)  winner='another';
@@ -668,17 +655,14 @@ function endVoting(){
   }
   state.voting.lastResult = winner;
 
-  // move singer to winners lists
   if(state.current?.name){
     if(winner==='encore'){ state.winners.encore.push(state.current.name); }
     else if(winner==='another'){ state.winners.another.push(state.current.name); }
     else { /* maybe */ }
   }
-  // mark color dot on rotation
   const idx = state.singers.findIndex(s=>s.id===state.current.id);
   if(idx>-1){ state.singers[idx]._color = winner==='encore'?'green': winner==='another'?'yellow':'red'; }
 
-  // "Maybe Next Time!" = elimination (remove from rotation)
   if(winner==='maybe'){ state.singers = state.singers.filter(s=>s.id!==state.current.id); state.current={id:null,name:'',songArtist:''}; }
 
   postState();
@@ -691,7 +675,6 @@ startBtn.onclick = openVoting;
 extendBtn.onclick = extendVoting;
 endBtn.onclick = endVoting;
 
-// quick host vote
 document.querySelectorAll('[data-vote]').forEach(btn=>{
   btn.addEventListener('click', async ()=>{
     const kind = btn.getAttribute('data-vote');
@@ -733,7 +716,6 @@ const sfx = (function(){
     if(!enabled) return;
     if(winner==='encore'){ aEncore.currentTime=0; aEncore.play().catch(()=>{}); }
     else if(winner==='maybe'){
-      // some browsers block wav initial playback; try mp3 fallback once
       aLoser.currentTime=0; aLoser.play().catch(async ()=>{
         if(!triedWavFallback){
           triedWavFallback=true;
@@ -750,6 +732,7 @@ const sfx = (function(){
 })();
 
 /* ---- PIN ---- */
+const togglePin=document.getElementById('togglePin');
 togglePin.addEventListener('click', ()=>{
   if(pin.type==='password'){ pin.type='text'; togglePin.textContent='Hide'; }
   else { pin.type='password'; togglePin.textContent='Show'; }
