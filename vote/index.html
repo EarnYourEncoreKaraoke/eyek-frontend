@@ -1,16 +1,16 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8" />
 <title>Encore! • Vote</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bgDeep1:#1B0930; --bgDeep2:#16072A;
-    --txt:#fff; --sub:#d8c7ff;
-    --green:#25d366; --yellow:#f6c945; --red:#ff5e6c;
-    --line:#6f52a8;
+    --txt:#FFFFFF; --sub:#D8C7FF;
+    --line:#6F52A8; --accent:#B692FF;
+    --green:#25D366; --yellow:#F6C945; --red:#FF5E6C;
   }
   *{box-sizing:border-box}
   body{margin:0;background:linear-gradient(180deg,var(--bgDeep1),var(--bgDeep2));color:var(--txt);font:17px/1.4 "Montserrat",system-ui}
@@ -18,7 +18,7 @@
   h1{margin:0;font-size:28px}
   .sub{color:var(--sub)}
   .pin{display:grid;grid-template-columns:1fr auto;gap:8px}
-  input{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:#220d3f;color:#fff}
+  input{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:#220D3F;color:#fff}
   button{padding:12px 14px;border-radius:10px;border:0;font-weight:800;cursor:pointer}
   .row{display:grid;grid-template-columns:1fr;gap:10px}
   .btnG{background:var(--green);color:#042a13}
@@ -30,7 +30,28 @@
   .mini{font-size:12px}
   .msg{min-height:18px}
   .voteRow{display:grid;grid-template-columns:1fr;gap:10px}
-  .who{border:1px dashed rgba(255,255,255,.25);padding:10px;border-radius:10px;background:#210d3f}
+  .who{border:1px dashed rgba(255,255,255,.25);padding:10px;border-radius:10px;background:#210D3F}
+  /* Overlay */
+  #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;z-index:9998}
+  #ovCard{padding:20px 18px;border-radius:16px;text-align:center;border:2px solid var(--line);background:linear-gradient(180deg,#1B0930,#16072A);min-width:270px}
+  #ovTitle{font-size:26px;font-weight:800}
+  /* Coupon banner (bottom) */
+  #couponBanner{
+    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 9999;
+    display: none; gap: 10px; align-items: center;
+    padding: 10px 12px; border-radius: 12px;
+    background: linear-gradient(180deg, var(--bgDeep1), var(--bgDeep2));
+    border: 1px solid var(--line); color: var(--txt);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  }
+  #couponBanner img{
+    height:44px; width:44px; object-fit:cover; border-radius:8px; border:1px solid var(--line);
+    display:none;
+  }
+  #couponBanner .txt{ font:600 14px/1.35 Montserrat, system-ui; }
+  #couponBanner a{ color: var(--accent); text-decoration: none; font-weight:700; display:none }
+  #couponClose{ margin-left:auto; background:#2A1352; border:1px solid var(--line); color:#fff; padding:6px 10px; border-radius:10px; cursor:pointer; }
+  @media (max-width:600px){ #couponBanner{ left:8px; right:8px; bottom:8px; } }
 </style>
 </head>
 <body>
@@ -44,7 +65,7 @@
   <section id="unlock">
     <div class="sub">Enter Event PIN to vote</div>
     <div class="pin" style="margin-top:6px">
-      <input id="pin" inputmode="numeric" placeholder="Event PIN" />
+      <input id="pin" inputmode="numeric" autocomplete="one-time-code" placeholder="Event PIN" />
       <button id="unlockBtn" class="btnG">Unlock</button>
     </div>
     <div class="msg mini" id="unlockMsg"></div>
@@ -70,65 +91,83 @@
   </section>
 
   <!-- Overlay result -->
-  <div id="overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;z-index:9998">
-    <div id="ovCard" class="ovCard" style="padding:20px 18px;border-radius:16px;text-align:center;border:2px solid #6f52a8;background:linear-gradient(180deg,#1B0930,#16072A);min-width:270px">
-      <div id="ovTitle" style="font-size:26px;font-weight:800">—</div>
+  <div id="overlay">
+    <div id="ovCard">
+      <div id="ovTitle">—</div>
       <div id="ovSub" class="sub" style="margin-top:6px">—</div>
     </div>
   </div>
 
 </div>
 
-<script>
-const GET_URL='/assets/get_state.php';
-const VOTE_URL='/assets/vote.php';
+<!-- Coupon banner (bottom of vote page) -->
+<div id="couponBanner" role="region" aria-label="Venue Coupon">
+  <img id="couponImg" alt="Coupon image" />
+  <div class="txt" id="couponTextOut">—</div>
+  <a id="couponLinkOut" href="#" target="_blank" rel="noopener">View</a>
+  <button id="couponClose" type="button">Close</button>
+</div>
 
-const $=s=>document.querySelector(s);
-const pin=$('#pin'), unlockBtn=$('#unlockBtn'), unlockMsg=$('#unlockMsg');
-const unlockSection=$('#unlock'), voteUI=$('#voteUI');
-const singerEl=$('#singer'), venueTitle=$('#venueTitle'), nowSinging=$('#nowSinging');
-const vE=$('#v_encore'), vA=$('#v_another'), vM=$('#v_maybe');
-let state=null, eventPin='', currentSingerId=null;
-let overlayTimer=null;
+<script>
+/* ===== Core vote page (PHP backend) ===== */
+const GET_URL = '/assets/get_state.php';
+const VOTE_URL = '/assets/vote.php';
+
+const $ = s => document.querySelector(s);
+const pinEl = $('#pin'), unlockBtn = $('#unlockBtn'), unlockMsg = $('#unlockMsg');
+const unlockSection = $('#unlock'), voteUI = $('#voteUI');
+const singerEl = $('#singer'), venueTitle = $('#venueTitle'), nowSinging = $('#nowSinging');
+const vE = $('#v_encore'), vA = $('#v_another'), vM = $('#v_maybe');
+const voteMsg = $('#voteMsg');
+let state = null, eventPin = '', currentSingerId = null;
+let overlayTimer = null;
 
 function deviceId(){
   try{
-    const k='eyek_device'; let v=localStorage.getItem(k);
+    const k='eyek_device';
+    let v=localStorage.getItem(k);
     if(!v){ v='d_'+Math.random().toString(36).slice(2,11); localStorage.setItem(k,v); }
     return v;
   }catch(e){ return 'na_'+Math.random().toString(36).slice(2,7); }
 }
 
 async function fetchState(){
-  const r=await fetch(GET_URL,{cache:'no-store'}); state=await r.json();
-  const s=state||{};
-  const e=s.event||{}; const c=s.current||{}; const v=s.voting||{};
+  const r = await fetch(GET_URL, { cache:'no-store' });
+  state = await r.json().catch(()=>null);
+  const s = state || {};
+  const e = s.event || {};
+  const c = s.current || {};
   venueTitle.textContent = e.venuePublic || e.venue || 'Encore! Vote';
   nowSinging.textContent = c.name ? ('Now singing: '+c.name) : '';
   currentSingerId = c.id || null;
   singerEl.textContent = c.name || '—';
-  // Pin stays the one you typed; we just need it to unlock
 }
 
-function setUnlocked(on){ unlockSection.classList.toggle('hidden', on); voteUI.classList.toggle('hidden', !on); }
+function setUnlocked(on){
+  unlockSection.classList.toggle('hidden', on);
+  voteUI.classList.toggle('hidden', !on);
+}
 
 unlockBtn.addEventListener('click', async ()=>{
-  eventPin = (pin.value||'').trim();
+  eventPin = (pinEl.value||'').trim();
   if(!eventPin){ unlockMsg.textContent='Enter the event PIN.'; return; }
-  // For now we just unlock locally; server validates on vote
   setUnlocked(true); unlockMsg.textContent='';
   await fetchState();
 });
 
 async function sendVote(kind){
   if(!currentSingerId){ voteMsg.textContent='No singer set yet.'; return; }
-  const body={ pin:eventPin, singer: currentSingerId, vote:kind, device: deviceId() };
+  const body = { pin: eventPin, singer: currentSingerId, vote: kind, device: deviceId() };
   try{
-    const r=await fetch(VOTE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!r.ok){ const e=await r.json().catch(()=>({error:'vote_failed'})); throw new Error(e.error||'vote_failed'); }
+    const r = await fetch(VOTE_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    if(!r.ok){
+      const e=await r.json().catch(()=>({error:'vote_failed'}));
+      throw new Error(e.error||'vote_failed');
+    }
     showOverlay(kind, kind==='encore'?'Encore! Congratulations!':(kind==='another'?'Another Shot!':'Maybe Next Time!'), 'Vote received');
   }catch(e){
-    const m=(e.message||''); if(m.includes('already')||m.includes('once')){ showOverlay('another','Already Voted','One vote per device per singer'); }
+    const m=(e.message||'');
+    if(m.includes('already')||m.includes('once')){ showOverlay('another','Already Voted','One vote per device per singer'); }
     else { showOverlay('maybe','Error','Please try again'); }
   }
   await fetchState();
@@ -142,79 +181,110 @@ setInterval(fetchState, 8000);
 fetchState();
 
 function showOverlay(kind, title, sub){
-  const ov=$('#overlay'), card=$('#ovCard');
-  document.getElementById('ovTitle').textContent=title;
-  document.getElementById('ovSub').textContent=sub;
-  card.className='ovCard '+(kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
-  ov.style.display='flex';
+  const ov = document.getElementById('overlay');
+  const card = document.getElementById('ovCard');
+  document.getElementById('ovTitle').textContent = title;
+  document.getElementById('ovSub').textContent = sub;
+  card.className = 'ovCard ' + (kind==='encore'?'ov-enc':kind==='another'?'ov-ano':'ov-may');
+  ov.style.display = 'flex';
   clearTimeout(overlayTimer);
-  overlayTimer=setTimeout(()=>{ ov.style.display='none'; }, 15000);
+  overlayTimer = setTimeout(()=>{ ov.style.display = 'none'; }, 15000);
 }
-function hideOverlay(){ const ov=$('#overlay'); if(ov.style.display!=='none') ov.style.display='none'; }
 </script>
 
-<!-- ===== COUPON BANNER (Audience) — shows at bottom of Vote page ===== -->
-<style>
-  #couponBanner {
-    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 9999;
-    display: none; gap: 10px; align-items: center;
-    padding: 10px 12px; border-radius: 12px;
-    background: linear-gradient(180deg, var(--bgDeep1), var(--bgDeep2));
-    border: 1px solid var(--line); color: var(--txt);
-    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+<!-- Firebase config (must exist at site root) -->
+<script src="/firebase-config.js"></script>
+
+<!-- Audience coupon: read from Firestore after PIN unlock; resolve Storage path to URL when needed -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js';
+import { getFirestore, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js';
+import { getStorage, ref, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-storage.js';
+
+const cfg = window.firebaseConfig;
+let app=null, auth=null, db=null, st=null;
+
+if (cfg) {
+  app = initializeApp(cfg);
+  auth = getAuth(app);
+  db   = getFirestore(app);
+  st   = getStorage(app);
+  // anonymous auth (harmless for read-only; required if you later tighten rules)
+  signInAnonymously(auth).catch(()=>{});
+} else {
+  console.warn('firebase-config.js missing or window.firebaseConfig not set; coupon banner will rely only on PHP state (none here).');
+}
+
+const banner   = document.getElementById('couponBanner');
+const imgEl    = document.getElementById('couponImg');
+const textEl   = document.getElementById('couponTextOut');
+const linkEl   = document.getElementById('couponLinkOut');
+const closeBtn = document.getElementById('couponClose');
+
+let dismissed = false;
+
+function isExpired(iso){
+  if(!iso) return false;
+  const t = Date.parse(iso);
+  return isNaN(t) ? false : (Date.now() > t);
+}
+
+// Accept multiple possible fields; if only a Storage PATH exists, resolve to URL
+async function resolveImageUrl(data){
+  const direct =
+    data?.couponImageUrl ||
+    data?.couponImageURL ||
+    data?.imageUrl ||
+    data?.imageURL || '';
+  if (direct) return direct;
+
+  const path = data?.couponImagePath || data?.imagePath || '';
+  if (!path || !st) return '';
+  try { return await getDownloadURL(ref(st, path)); }
+  catch { return ''; }
+}
+
+async function renderCoupon(data){
+  const exp = data?.expiresAtISO || data?.expiresAt || '';
+  if (!data || !data.couponText || isExpired(exp) || dismissed) {
+    banner.style.display = 'none';
+    return;
   }
-  #couponBanner img { height: 44px; width: 44px; object-fit: cover; border-radius: 8px; border:1px solid var(--line); display:none }
-  #couponBanner .txt { font: 600 14px/1.35 Montserrat, system-ui; }
-  #couponBanner a { color: #B692FF; text-decoration: none; font-weight: 700; display:none }
-  #couponClose { margin-left: auto; background: #2a1352; border:1px solid var(--line); color:#fff; padding:6px 10px; border-radius:10px; cursor:pointer; }
-  @media (max-width:600px){ #couponBanner { left: 8px; right: 8px; bottom: 8px; } }
-</style>
-<div id="couponBanner" role="region" aria-label="Venue Coupon">
-  <img id="couponImg" alt="Coupon image" />
-  <div class="txt" id="couponTextOut">—</div>
-  <a id="couponLinkOut" href="#" target="_blank" rel="noopener">View</a>
-  <button id="couponClose" type="button">Close</button>
-</div>
-<script>
-(function(){
-  const GET_URL='/assets/get_state.php';
-  const el=document.getElementById('couponBanner');
-  const img=document.getElementById('couponImg');
-  const txt=document.getElementById('couponTextOut');
-  const a=document.getElementById('couponLinkOut');
-  const closeBtn=document.getElementById('couponClose');
-  let dismissed=false;
+  textEl.textContent = data.couponText || '';
 
-  function isExpired(iso){
-    if(!iso) return false;
-    const t=Date.parse(iso); if(isNaN(t)) return false;
-    return Date.now() > t;
-  }
+  const url = await resolveImageUrl(data);
+  if (url) { imgEl.src = url; imgEl.style.display = ''; }
+  else { imgEl.style.display = 'none'; }
 
-  function renderCoupon(c){
-    if(!c || !c.couponText || isExpired(c.expiresAt) || dismissed){ el.style.display='none'; return; }
-    txt.textContent = c.couponText || '';
-    if(c.couponImageUrl){ img.src=c.couponImageUrl; img.style.display=''; } else { img.style.display='none'; }
-    if(c.couponLink){ a.href=c.couponLink; a.style.display=''; } else { a.style.display='none'; }
-    el.style.display='flex';
-  }
+  if (data.couponLink) { linkEl.href = data.couponLink; linkEl.style.display = ''; }
+  else { linkEl.style.display = 'none'; }
 
-  async function fetchStateOnce(){
-    try{
-      const r=await fetch(GET_URL,{cache:'no-store'});
-      const s=await r.json();
-      const coupon = (s?.event?.coupon) || (s?.state?.event?.coupon) || null;
-      renderCoupon(coupon);
-    }catch(e){ /* silent */ }
-  }
+  banner.style.display = 'flex';
+}
 
-  closeBtn.addEventListener('click', ()=>{ dismissed=true; el.style.display='none'; });
+closeBtn.addEventListener('click', ()=>{ dismissed = true; banner.style.display='none'; });
 
-  fetchStateOnce();
-  setInterval(fetchStateOnce, 10000);
+// Hook after the existing PIN unlock button
+(function attachAfterUnlock(){
+  const pinInput  = document.getElementById('pin');
+  const unlockBtn = document.getElementById('unlockBtn');
+  if(!pinInput || !unlockBtn) return;
+
+  unlockBtn.addEventListener('click', ()=>{
+    const pin = (pinInput.value || '').trim();
+    if(!pin || !db) return;
+
+    const refDoc = doc(db, 'events', String(pin), 'promo', 'coupon');
+    onSnapshot(refDoc, async (ss)=>{
+      const data = ss.exists() ? ss.data() : null;
+      // helpful during testing:
+      // console.log('coupon@firestore', data);
+      await renderCoupon(data);
+    }, ()=>{/* ignore audience read errors */});
+  });
 })();
 </script>
 
 </body>
 </html>
-<!-- FILE: /vote/index.html -->
