@@ -1,0 +1,22 @@
+name: Create Backup Zip File
+
+on:
+  workflow_dispatch:  # 👈 This makes it manual — you trigger it from GitHub
+
+jobs:
+  zip-site:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create ZIP of site files
+        run: |
+          zip -r site-files.zip ./
+
+      - name: Upload ZIP as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: site-files
+          path: site-files.zip
